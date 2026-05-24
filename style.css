@@ -913,6 +913,18 @@ tr.detail-row td { padding: 0; }
         padding: 0 16px;
         overflow-x: hidden;
     }
+
+    /* iOS Safari auto-zoom prevention:
+       Safari zooms the page when focusing inputs with font-size < 16px.
+       Setting 16px on focus prevents the zoom while keeping compact sizes. */
+    input:focus,
+    textarea:focus,
+    select:focus {
+        font-size: 16px;
+    }
+    .notes-textarea:focus {
+        font-size: 16px;
+    }
 }
 
 /* --- Mobile Card Layout --- */
@@ -1341,6 +1353,9 @@ tr.detail-row td { padding: 0; }
     .modal-overlay {
         align-items: flex-end;
         padding: 0;
+    }
+    .settings-input:focus {
+        font-size: 16px;
     }
 }
 
