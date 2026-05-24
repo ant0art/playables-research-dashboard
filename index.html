@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>playables.research</title>
+    <meta name="description" content="Research dashboard for playable ads GitHub repositories">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Auth Screen -->
+    <div id="auth-screen" class="screen">
+        <div class="auth-container">
+            <div class="auth-logo">
+                <span class="material-symbols-outlined" style="font-size:32px;color:var(--primary)">terminal</span>
+                <span class="auth-title">playables.research</span>
+            </div>
+            <p class="auth-description">GitHub repository research dashboard for playable ads development</p>
+            <button id="btn-signin" class="btn-primary auth-btn">
+                <span class="material-symbols-outlined">login</span>
+                Sign in with Google
+            </button>
+        </div>
+    </div>
+
+    <!-- Sheet Picker Screen -->
+    <div id="sheet-screen" class="screen hidden">
+        <div class="sheet-container">
+            <div class="sheet-header">
+                <span class="material-symbols-outlined" style="color:var(--primary)">table_chart</span>
+                <h2>Connect a Sheet</h2>
+            </div>
+            <div class="sheet-options">
+                <button id="btn-create-sheet" class="sheet-option">
+                    <span class="material-symbols-outlined">add_circle_outline</span>
+                    <div>
+                        <strong>Create new</strong>
+                        <span class="sheet-option-desc">Empty sheet with pre-configured structure</span>
+                    </div>
+                </button>
+                <button id="btn-pick-sheet" class="sheet-option">
+                    <span class="material-symbols-outlined">folder_open</span>
+                    <div>
+                        <strong>Choose from Drive</strong>
+                        <span class="sheet-option-desc">Select an existing spreadsheet</span>
+                    </div>
+                </button>
+                <div class="sheet-option-manual">
+                    <span class="material-symbols-outlined">key</span>
+                    <input id="input-sheet-id" type="text" placeholder="Paste Sheet ID manually">
+                    <button id="btn-connect-sheet" class="btn-secondary">Connect</button>
+                </div>
+            </div>
+            <button id="btn-signout-sheet" class="btn-ghost">Sign out</button>
+        </div>
+    </div>
+
+    <!-- Dashboard Screen -->
+    <div id="dashboard-screen" class="screen hidden">
+        <!-- Nav -->
+        <nav id="topnav">
+            <div class="nav-left">
+                <span class="material-symbols-outlined nav-icon" style="font-variation-settings:'FILL' 1">terminal</span>
+                <span class="nav-brand">playables.research</span>
+                <button id="btn-menu-toggle" class="btn-icon nav-menu-toggle">
+                    <span class="material-symbols-outlined">menu</span>
+                </button>
+            </div>
+            <div class="nav-right">
+                <button id="btn-switch-sheet" class="btn-secondary nav-btn-desktop">
+                    <span class="material-symbols-outlined">swap_horiz</span>
+                    Switch Sheet
+                </button>
+                <span id="user-name" class="nav-user nav-btn-desktop"></span>
+                <button id="btn-signout" class="btn-ghost nav-btn-desktop">Sign out</button>
+                <button id="btn-theme" class="btn-icon" title="Toggle theme">
+                    <span class="material-symbols-outlined">light_mode</span>
+                </button>
+                <button id="btn-user-avatar" class="btn-icon">
+                    <span class="material-symbols-outlined" style="font-size:20px">account_circle</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Mobile menu -->
+        <div id="mobile-menu" class="mobile-menu hidden">
+            <button id="btn-switch-sheet-mobile" class="mobile-menu-item">
+                <span class="material-symbols-outlined">swap_horiz</span> Switch Sheet
+            </button>
+            <button id="btn-signout-mobile" class="mobile-menu-item">
+                <span class="material-symbols-outlined">logout</span> Sign out
+            </button>
+        </div>
+
+        <!-- Filters -->
+        <div id="filter-bar">
+            <div class="filter-pills">
+                <span class="filter-label">FILTERS</span>
+                <select id="filter-category" class="filter-select">
+                    <option value="">Category</option>
+                </select>
+                <select id="filter-language" class="filter-select">
+                    <option value="">Language</option>
+                </select>
+                <select id="filter-status" class="filter-select">
+                    <option value="">Status</option>
+                    <option value="new">new</option>
+                    <option value="watch">watch</option>
+                    <option value="skip">skip</option>
+                    <option value="integrated">integrated</option>
+                </select>
+                <select id="filter-effort" class="filter-select">
+                    <option value="">Effort</option>
+                    <option value="low">low</option>
+                    <option value="medium">medium</option>
+                    <option value="high">high</option>
+                </select>
+            </div>
+            <div class="filter-search-wrap">
+                <span class="material-symbols-outlined filter-search-icon">search</span>
+                <input id="filter-search" type="text" class="filter-search" placeholder="Search repos...">
+            </div>
+        </div>
+
+        <!-- Stats bar -->
+        <div id="stats-bar">
+            <span id="stat-total" class="stat-item">0 repos</span>
+            <span class="stat-sep">|</span>
+            <span id="stat-filtered" class="stat-item">0 shown</span>
+            <span class="stat-sep">|</span>
+            <span id="stat-watched" class="stat-item">0 watched</span>
+        </div>
+
+        <!-- Table -->
+        <main id="table-wrap">
+            <table id="repo-table">
+                <thead>
+                    <tr>
+                        <th class="col-expand"></th>
+                        <th class="col-name sortable" data-sort="full_name">Name <span class="sort-arrow"></span></th>
+                        <th class="col-stars sortable" data-sort="stars">Stars <span class="sort-arrow"></span></th>
+                        <th class="col-cat sortable" data-sort="category">Category <span class="sort-arrow"></span></th>
+                        <th class="col-score sortable" data-sort="relevance_score">Score <span class="sort-arrow"></span></th>
+                        <th class="col-rating sortable" data-sort="my_rating">My Rating <span class="sort-arrow"></span></th>
+                        <th class="col-status sortable" data-sort="status">Status <span class="sort-arrow"></span></th>
+                        <th class="col-effort sortable" data-sort="integration_effort">Effort <span class="sort-arrow"></span></th>
+                    </tr>
+                </thead>
+                <tbody id="repo-tbody"></tbody>
+            </table>
+            <div id="empty-state" class="empty-state hidden">
+                <span class="material-symbols-outlined" style="font-size:48px;color:var(--muted)">search_off</span>
+                <p>No repositories found</p>
+            </div>
+            <div id="loading-state" class="loading-state hidden">
+                <div class="spinner"></div>
+                <p>Loading data from Google Sheets...</p>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
