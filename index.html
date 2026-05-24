@@ -78,6 +78,9 @@
                     <span class="material-symbols-outlined">swap_horiz</span>
                     Switch Sheet
                 </button>
+                <button id="btn-settings" class="btn-icon" title="Pipeline settings">
+                    <span class="material-symbols-outlined">settings</span>
+                </button>
                 <span id="user-name" class="nav-user nav-btn-desktop"></span>
                 <button id="btn-signout" class="btn-ghost nav-btn-desktop">Sign out</button>
                 <button id="btn-theme" class="btn-icon" title="Toggle theme">
@@ -91,12 +94,83 @@
 
         <!-- Mobile menu -->
         <div id="mobile-menu" class="mobile-menu hidden">
+            <button id="btn-settings-mobile" class="mobile-menu-item">
+                <span class="material-symbols-outlined">settings</span> Pipeline Settings
+            </button>
             <button id="btn-switch-sheet-mobile" class="mobile-menu-item">
                 <span class="material-symbols-outlined">swap_horiz</span> Switch Sheet
             </button>
             <button id="btn-signout-mobile" class="mobile-menu-item">
                 <span class="material-symbols-outlined">logout</span> Sign out
             </button>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal-overlay hidden">
+            <div class="settings-panel">
+                <div class="settings-header">
+                    <div class="settings-title">
+                        <span class="material-symbols-outlined">settings</span>
+                        <h2>Pipeline Settings</h2>
+                    </div>
+                    <button id="btn-close-settings" class="btn-icon">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="settings-body">
+                    <!-- GitHub Connection -->
+                    <div class="settings-section">
+                        <div class="settings-section-label">GitHub Connection</div>
+                        <div class="settings-card">
+                            <label class="settings-field-label">Personal Access Token</label>
+                            <div class="settings-pat-row">
+                                <input id="input-github-pat" type="password" class="settings-input" placeholder="ghp_..." autocomplete="off">
+                                <button id="btn-save-pat" class="btn-secondary btn-sm" title="Save token">
+                                    <span class="material-symbols-outlined">save</span>
+                                </button>
+                            </div>
+                            <div id="pat-status" class="settings-status"></div>
+                        </div>
+                    </div>
+
+                    <!-- Schedule -->
+                    <div class="settings-section" id="section-schedule">
+                        <div class="settings-section-label">Schedule</div>
+                        <div class="settings-card">
+                            <div class="settings-toggle-row">
+                                <span id="schedule-status-text" class="schedule-status active">Active</span>
+                                <label class="toggle">
+                                    <input type="checkbox" id="toggle-schedule-enabled" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="settings-time-row">
+                                <span class="settings-field-label">Daily at</span>
+                                <select id="select-schedule-hour" class="settings-select"></select>
+                                <span class="settings-time-utc">:00 UTC</span>
+                            </div>
+                            <div id="local-time-display" class="settings-local-time"></div>
+                            <button id="btn-save-schedule" class="btn-save-schedule hidden">
+                                <span class="material-symbols-outlined">save</span>
+                                Save Schedule
+                            </button>
+                            <div id="schedule-status" class="settings-status"></div>
+                        </div>
+                    </div>
+
+                    <!-- Manual Run -->
+                    <div class="settings-section" id="section-run">
+                        <div class="settings-section-label">Manual Run</div>
+                        <div class="settings-card">
+                            <button id="btn-run-now" class="btn-run-now">
+                                <span class="material-symbols-outlined">play_arrow</span>
+                                Run Research Now
+                            </button>
+                            <div id="last-run-info" class="settings-last-run"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Filters -->

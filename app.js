@@ -56,6 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     loadGoogleIdentity();
     bindEvents();
+    bindSettingsEvents();
 });
 
 // ============================================================
@@ -826,3 +827,338 @@ function bindMobileCardEvents() {
         });
     });
 }
+
+// ============================================================
+// GitHub API — Pipeline Control
+// ============================================================
+
+const GITHUB = {
+    OWNER: 'ant0art',
+    REPO: 'playables-research',
+    API: 'https://api.github.com',
+    WORKFLOW: 'daily-research.yml',
+    PAT_KEY: 'pr_github_pat',
+};
+
+function getGitHubPAT() { return localStorage.getItem(GITHUB.PAT_KEY) || ''; }
+function storeGitHubPAT(pat) { localStorage.setItem(GITHUB.PAT_KEY, pat); }
+
+async function ghApi(path, options = {}) {
+    const pat = getGitHubPAT();
+    if (!pat) throw new Error('GitHub PAT not configured');
+    const res = await fetch(`${GITHUB.API}${path}`, {
+        ...options,
+        headers: {
+            Authorization: `Bearer ${pat}`,
+            Accept: 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'Content-Type': 'application/json',
+            ...options.headers,
+        },
+    });
+    if (res.status === 204) return null;
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `API ${res.status}`);
+    }
+    return res.json();
+}
+
+async function ghGetVariable(name) {
+    try {
+        const d = await ghApi(`/repos/${GITHUB.OWNER}/${GITHUB.REPO}/actions/variables/${name}`);
+        return d.value;
+    } catch (e) {
+        if (e.message.includes('404') || e.message.includes('Not Found')) return null;
+        throw e;
+    }
+}
+
+async function ghSetVariable(name, value) {
+    try {
+        await ghApi(`/repos/${GITHUB.OWNER}/${GITHUB.REPO}/actions/variables/${name}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ value: String(value) }),
+        });
+    } catch (e) {
+        if (e.message.includes('404') || e.message.includes('Not Found')) {
+            await ghApi(`/repos/${GITHUB.OWNER}/${GITHUB.REPO}/actions/variables`, {
+                method: 'POST',
+                body: JSON.stringify({ name, value: String(value) }),
+            });
+        } else {
+            throw e;
+        }
+    }
+}
+
+async function ghTriggerWorkflow() {
+    await ghApi(`/repos/${GITHUB.OWNER}/${GITHUB.REPO}/actions/workflows/${GITHUB.WORKFLOW}/dispatches`, {
+        method: 'POST',
+        body: JSON.stringify({ ref: 'main' }),
+    });
+}
+
+async function ghGetLatestRun() {
+    const d = await ghApi(`/repos/${GITHUB.OWNER}/${GITHUB.REPO}/actions/workflows/${GITHUB.WORKFLOW}/runs?per_page=5&branch=main`);
+    // Find the first non-skipped run (gate job may cause skips)
+    const runs = d.workflow_runs || [];
+    return runs.find(r => r.conclusion !== 'skipped') || runs[0] || null;
+}
+
+async function ghVerifyUser() {
+    return ghApi('/user');
+}
+
+// ============================================================
+// Settings Panel
+// ============================================================
+
+function initSettingsHourOptions() {
+    const sel = $('select-schedule-hour');
+    if (sel.children.length > 0) return;
+    for (let h = 0; h < 24; h++) {
+        const opt = document.createElement('option');
+        opt.value = h;
+        opt.textContent = String(h).padStart(2, '0');
+        sel.appendChild(opt);
+    }
+}
+
+function utcHourToLocal(utcHour) {
+    const now = new Date();
+    const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), utcHour, 0, 0));
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function updateLocalTimeLabel(utcHour) {
+    $('local-time-display').textContent = `≈ ${utcHourToLocal(utcHour)} local time`;
+}
+
+function setScheduleStatusText(enabled) {
+    const el = $('schedule-status-text');
+    el.textContent = enabled ? 'Active' : 'Paused';
+    el.className = `schedule-status ${enabled ? 'active' : 'paused'}`;
+}
+
+function setStatusMsg(id, msg, type) {
+    const el = $(id);
+    if (!el) return;
+    el.textContent = msg;
+    el.className = `settings-status ${type || ''}`;
+}
+
+function timeAgo(date) {
+    const ms = Date.now() - date.getTime();
+    const m = Math.floor(ms / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+}
+
+async function openSettings() {
+    $('settings-modal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+
+    initSettingsHourOptions();
+
+    const pat = getGitHubPAT();
+    $('input-github-pat').value = pat ? '•'.repeat(20) : '';
+
+    if (pat) {
+        await loadSettingsData();
+    } else {
+        setStatusMsg('pat-status', '⚠️ Enter a GitHub PAT with repo scope', 'warning');
+    }
+}
+
+function closeSettings() {
+    $('settings-modal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+async function loadSettingsData() {
+    setStatusMsg('pat-status', 'Connecting…', 'loading');
+    setStatusMsg('schedule-status', '', '');
+    $('last-run-info').textContent = '';
+
+    try {
+        const [user, hourStr, enabledStr, lastRun] = await Promise.all([
+            ghVerifyUser(),
+            ghGetVariable('RESEARCH_HOUR_UTC').catch(() => null),
+            ghGetVariable('RESEARCH_ENABLED').catch(() => null),
+            ghGetLatestRun().catch(() => null),
+        ]);
+
+        // PAT status
+        setStatusMsg('pat-status', `✅ Connected · ${user.login}`, 'success');
+
+        // Schedule hour
+        const hour = hourStr !== null ? parseInt(hourStr, 10) : 0;
+        $('select-schedule-hour').value = hour;
+        updateLocalTimeLabel(hour);
+
+        // Schedule enabled
+        const enabled = enabledStr !== 'false';
+        $('toggle-schedule-enabled').checked = enabled;
+        setScheduleStatusText(enabled);
+
+        // Store loaded values for dirty tracking
+        state._scheduleHour = hour;
+        state._scheduleEnabled = enabled;
+        $('btn-save-schedule').classList.add('hidden');
+
+        // Last run
+        if (lastRun) {
+            const status = lastRun.conclusion || lastRun.status;
+            const icon = status === 'success' ? '✅' : status === 'failure' ? '❌' : status === 'in_progress' ? '⏳' : '⚪';
+            const when = timeAgo(new Date(lastRun.created_at));
+            $('last-run-info').textContent = `${icon} ${status} · ${when}`;
+        }
+    } catch (e) {
+        setStatusMsg('pat-status', `❌ ${e.message}`, 'error');
+    }
+}
+
+async function savePATFromInput() {
+    const input = $('input-github-pat');
+    const val = input.value.trim();
+    if (!val || val.includes('•')) return;
+
+    storeGitHubPAT(val);
+    input.value = '•'.repeat(20);
+    input.type = 'password';
+
+    try {
+        setStatusMsg('pat-status', 'Verifying…', 'loading');
+        const user = await ghVerifyUser();
+        setStatusMsg('pat-status', `✅ Connected · ${user.login}`, 'success');
+        await loadSettingsData();
+    } catch (e) {
+        setStatusMsg('pat-status', `❌ Invalid token: ${e.message}`, 'error');
+        localStorage.removeItem(GITHUB.PAT_KEY);
+    }
+}
+
+function onScheduleChanged() {
+    // Update local preview only
+    const hour = parseInt($('select-schedule-hour').value, 10);
+    updateLocalTimeLabel(hour);
+    setScheduleStatusText($('toggle-schedule-enabled').checked);
+
+    // Show save button if anything changed from loaded state
+    const hourDirty = hour !== (state._scheduleHour ?? 0);
+    const enabledDirty = $('toggle-schedule-enabled').checked !== (state._scheduleEnabled ?? true);
+    $('btn-save-schedule').classList.toggle('hidden', !hourDirty && !enabledDirty);
+    setStatusMsg('schedule-status', '', '');
+}
+
+async function saveScheduleSettings() {
+    const hour = parseInt($('select-schedule-hour').value, 10);
+    const enabled = $('toggle-schedule-enabled').checked;
+    const btn = $('btn-save-schedule');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-outlined spinning">progress_activity</span> Saving…';
+    setStatusMsg('schedule-status', '', '');
+
+    try {
+        await Promise.all([
+            ghSetVariable('RESEARCH_HOUR_UTC', String(hour)),
+            ghSetVariable('RESEARCH_ENABLED', String(enabled)),
+        ]);
+
+        // Update stored state
+        state._scheduleHour = hour;
+        state._scheduleEnabled = enabled;
+
+        btn.innerHTML = '<span class="material-symbols-outlined">check_circle</span> Saved!';
+        setTimeout(() => {
+            btn.classList.add('hidden');
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-symbols-outlined">save</span> Save Schedule';
+        }, 1500);
+    } catch (e) {
+        setStatusMsg('schedule-status', `❌ ${e.message}`, 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-symbols-outlined">save</span> Save Schedule';
+    }
+}
+
+async function runResearchNow() {
+    const btn = $('btn-run-now');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-outlined spinning">progress_activity</span> Starting…';
+
+    try {
+        await ghTriggerWorkflow();
+        btn.innerHTML = '<span class="material-symbols-outlined">check_circle</span> Triggered!';
+        $('last-run-info').textContent = '⏳ queued · just now';
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-symbols-outlined">play_arrow</span> Run Research Now';
+        }, 3000);
+    } catch (e) {
+        btn.innerHTML = `<span class="material-symbols-outlined">error</span> ${e.message}`;
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-symbols-outlined">play_arrow</span> Run Research Now';
+        }, 3000);
+    }
+}
+
+// ============================================================
+// Settings Event Bindings
+// ============================================================
+
+function bindSettingsEvents() {
+    // Open/close
+    $('btn-settings').addEventListener('click', openSettings);
+    $('btn-settings-mobile').addEventListener('click', () => {
+        $('mobile-menu').classList.add('hidden');
+        openSettings();
+    });
+    $('btn-close-settings').addEventListener('click', closeSettings);
+    $('settings-modal').addEventListener('click', (e) => {
+        if (e.target === $('settings-modal')) closeSettings();
+    });
+
+    // Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !$('settings-modal').classList.contains('hidden')) {
+            closeSettings();
+        }
+    });
+
+    // PAT
+    $('btn-save-pat').addEventListener('click', savePATFromInput);
+    $('input-github-pat').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') savePATFromInput();
+    });
+    // Clear placeholder on focus
+    $('input-github-pat').addEventListener('focus', () => {
+        const input = $('input-github-pat');
+        if (input.value.includes('•')) {
+            input.value = '';
+            input.type = 'text';
+        }
+    });
+    $('input-github-pat').addEventListener('blur', () => {
+        const input = $('input-github-pat');
+        if (!input.value && getGitHubPAT()) {
+            input.value = '•'.repeat(20);
+            input.type = 'password';
+        }
+    });
+
+    // Schedule — preview on change, save on button click
+    $('select-schedule-hour').addEventListener('change', onScheduleChanged);
+    $('toggle-schedule-enabled').addEventListener('change', onScheduleChanged);
+    $('btn-save-schedule').addEventListener('click', saveScheduleSettings);
+
+    // Run now
+    $('btn-run-now').addEventListener('click', runResearchNow);
+}
+
