@@ -51,36 +51,9 @@ function toggleTheme() {
     applyTheme(current === 'dark' ? 'light' : 'dark');
 }
 
-// --- iOS Safari zoom reset ---
-// Safari auto-zooms on input focus when font-size < 16px.
-// Even with CSS fix (font-size:16px on :focus), the viewport may stay zoomed after blur.
-// This resets the viewport scale when the user finishes editing.
-function initIOSZoomReset() {
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    if (!isIOS) return;
-
-    const viewport = document.querySelector('meta[name="viewport"]');
-    if (!viewport) return;
-
-    const originalContent = viewport.getAttribute('content');
-
-    document.addEventListener('blur', (e) => {
-        const tag = e.target.tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
-            // Briefly lock scale to 1.0 to force Safari to reset zoom
-            viewport.setAttribute('content', originalContent + ', maximum-scale=1.0');
-            requestAnimationFrame(() => {
-                viewport.setAttribute('content', originalContent);
-            });
-        }
-    }, true);
-}
-
 // --- Init ---
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
-    initIOSZoomReset();
     loadGoogleIdentity();
     bindEvents();
     bindSettingsEvents();
