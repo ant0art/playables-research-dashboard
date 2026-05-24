@@ -6,7 +6,7 @@
 // --- Config ---
 const CONFIG = {
     CLIENT_ID: '595035411222-q99v60hb2626gq70snicoipnam6ap6tr.apps.googleusercontent.com',
-    SCOPES: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file',
+    SCOPES: 'openid profile email https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.readonly',
     SHEETS_API: 'https://sheets.googleapis.com/v4/spreadsheets',
     DRIVE_API: 'https://www.googleapis.com/drive/v3/files',
     STORAGE_KEY: 'pr_sheet_id',
@@ -94,6 +94,11 @@ function signIn() {
         client_id: CONFIG.CLIENT_ID,
         scope: CONFIG.SCOPES,
         callback: (response) => {
+            if (response.error) {
+                console.error('OAuth error:', response.error, response.error_description);
+                alert('Sign-in failed: ' + (response.error_description || response.error));
+                return;
+            }
             if (response.access_token) {
                 state.token = response.access_token;
                 sessionStorage.setItem('pr_token', response.access_token);
@@ -104,8 +109,14 @@ function signIn() {
                     } else {
                         showSheetPicker();
                     }
+                }).catch(err => {
+                    console.error('User info fetch failed:', err);
+                    alert('Failed to fetch user info: ' + err.message);
                 });
             }
+        },
+        error_callback: (err) => {
+            console.error('OAuth popup error:', err);
         },
     });
     client.requestAccessToken();
@@ -122,11 +133,20 @@ function signOut() {
 }
 
 async function fetchUserInfo() {
-    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-        headers: { Authorization: `Bearer ${state.token}` },
-    });
-    if (!res.ok) throw new Error('Failed to fetch user info');
-    state.user = await res.json();
+    try {
+        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${state.token}` },
+        });
+        if (res.ok) {
+            state.user = await res.json();
+        } else {
+            console.warn('userinfo returned', res.status, '— continuing without user details');
+            state.user = { name: 'User' };
+        }
+    } catch (e) {
+        console.warn('userinfo fetch failed:', e.message);
+        state.user = { name: 'User' };
+    }
 }
 
 // ============================================================
@@ -231,10 +251,58 @@ async function createNewSheet() {
     return sheet.spreadsheetId;
 }
 
-async function connectSheet(sheetId) {
-    state.sheetId = sheetId;
-    localStorage.setItem(CONFIG.STORAGE_KEY, sheetId);
+async function connectSheet(input) {
+    // Parse sheet ID from URL or raw ID
+    const id = parseSheetId(input);
+    if (!id) {
+        alert('Invalid Sheet URL or ID');
+        return;
+    }
+    state.sheetId = id;
+    localStorage.setItem(CONFIG.STORAGE_KEY, id);
     showDashboard();
+}
+
+function parseSheetId(input) {
+    if (!input) return null;
+    input = input.trim();
+    // Full URL: https://docs.google.com/spreadsheets/d/SHEET_ID/...
+    const urlMatch = input.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+    if (urlMatch) return urlMatch[1];
+    // Already an ID (alphanumeric, hyphens, underscores)
+    if (/^[a-zA-Z0-9_-]{20,}$/.test(input)) return input;
+    return null;
+}
+
+async function loadDriveSpreadsheets() {
+    $('drive-list').classList.remove('hidden');
+    $('drive-list-items').innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Loading...</p></div>';
+    try {
+        const res = await fetch(
+            `${CONFIG.DRIVE_API}?q=mimeType='application/vnd.google-apps.spreadsheet'&orderBy=modifiedTime desc&pageSize=20&fields=files(id,name,modifiedTime)`,
+            { headers: { Authorization: `Bearer ${state.token}` } }
+        );
+        if (!res.ok) throw new Error(`Drive API ${res.status}`);
+        const data = await res.json();
+        const files = data.files || [];
+        if (files.length === 0) {
+            $('drive-list-items').innerHTML = '<div class="empty-state"><p>No spreadsheets found</p></div>';
+            return;
+        }
+        $('drive-list-items').innerHTML = files.map(f =>
+            `<button class="drive-list-item" data-id="${f.id}">
+                <span class="material-symbols-outlined">table_chart</span>
+                <span>${f.name}</span>
+            </button>`
+        ).join('');
+        // Bind clicks
+        $('drive-list-items').querySelectorAll('.drive-list-item').forEach(btn => {
+            btn.addEventListener('click', () => connectSheet(btn.dataset.id));
+        });
+    } catch (e) {
+        console.error('Drive list error:', e);
+        $('drive-list-items').innerHTML = `<div class="empty-state"><p>Could not load files. Try pasting the URL instead.</p></div>`;
+    }
 }
 
 async function loadSheetData() {
@@ -473,7 +541,7 @@ function renderTable(repos) {
             <td class="cell-score ${scoreClass(repo.relevance_score)}">${repo.relevance_score}</td>
             <td>${starsHTML(repo.my_rating, repo.full_name)}</td>
             <td>${statusBadge(repo.status)}</td>
-            <td><div class="effort-cell">${effortDot(repo.integration_effort)} ${(repo.integration_effort || '-').toLowerCase()}</div></td>
+            <td class="col-effort"><div class="effort-cell">${effortDot(repo.integration_effort)} ${(repo.integration_effort || '-').toLowerCase()}</div></td>
         </tr>`;
 
         if (isExpanded) {
@@ -604,28 +672,20 @@ function bindEvents() {
     $('btn-signin').addEventListener('click', signIn);
 
     // Sheet picker
-    $('btn-create-sheet').addEventListener('click', async () => {
-        $('btn-create-sheet').textContent = 'Creating...';
-        try {
-            const id = await createNewSheet();
-            connectSheet(id);
-        } catch (e) {
-            alert('Failed to create sheet: ' + e.message);
-        }
-        $('btn-create-sheet').innerHTML = '<span class="material-symbols-outlined">add_circle_outline</span><div><strong>Create new</strong><span class="sheet-option-desc">Empty sheet with pre-configured structure</span></div>';
-    });
-
     $('btn-connect-sheet').addEventListener('click', () => {
-        const id = $('input-sheet-id').value.trim();
-        if (id) connectSheet(id);
+        const val = $('input-sheet-id').value.trim();
+        if (val) connectSheet(val);
     });
 
     $('input-sheet-id').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
-            const id = $('input-sheet-id').value.trim();
-            if (id) connectSheet(id);
+            const val = $('input-sheet-id').value.trim();
+            if (val) connectSheet(val);
         }
     });
+
+    $('btn-pick-sheet').addEventListener('click', loadDriveSpreadsheets);
+    $('btn-drive-close').addEventListener('click', () => $('drive-list').classList.add('hidden'));
 
     $('btn-signout-sheet').addEventListener('click', signOut);
 
@@ -654,6 +714,14 @@ function bindEvents() {
     $('filter-language').addEventListener('change', (e) => { state.filters.language = e.target.value; renderAll(); });
     $('filter-status').addEventListener('change', (e) => { state.filters.status = e.target.value; renderAll(); });
     $('filter-effort').addEventListener('change', (e) => { state.filters.effort = e.target.value; renderAll(); });
+
+    // Mobile sort
+    $('mobile-sort').addEventListener('change', (e) => {
+        const [col, dir] = e.target.value.split(':');
+        state.sortCol = col;
+        state.sortDir = dir;
+        renderAll();
+    });
 
     // Search (debounced)
     let searchTimer;

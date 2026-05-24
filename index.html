@@ -35,13 +35,6 @@
                 <h2>Connect a Sheet</h2>
             </div>
             <div class="sheet-options">
-                <button id="btn-create-sheet" class="sheet-option">
-                    <span class="material-symbols-outlined">add_circle_outline</span>
-                    <div>
-                        <strong>Create new</strong>
-                        <span class="sheet-option-desc">Empty sheet with pre-configured structure</span>
-                    </div>
-                </button>
                 <button id="btn-pick-sheet" class="sheet-option">
                     <span class="material-symbols-outlined">folder_open</span>
                     <div>
@@ -50,9 +43,19 @@
                     </div>
                 </button>
                 <div class="sheet-option-manual">
-                    <span class="material-symbols-outlined">key</span>
-                    <input id="input-sheet-id" type="text" placeholder="Paste Sheet ID manually">
+                    <span class="material-symbols-outlined">link</span>
+                    <input id="input-sheet-id" type="text" placeholder="Paste Sheet URL or ID">
                     <button id="btn-connect-sheet" class="btn-secondary">Connect</button>
+                </div>
+            </div>
+            <!-- Drive list (hidden by default) -->
+            <div id="drive-list" class="drive-list hidden">
+                <div class="drive-list-header">
+                    <span class="detail-section-title">Your Spreadsheets</span>
+                    <button id="btn-drive-close" class="btn-icon"><span class="material-symbols-outlined">close</span></button>
+                </div>
+                <div id="drive-list-items" class="drive-list-items">
+                    <div class="loading-state"><div class="spinner"></div><p>Loading...</p></div>
                 </div>
             </div>
             <button id="btn-signout-sheet" class="btn-ghost">Sign out</button>
@@ -118,6 +121,13 @@
                     <option value="low">low</option>
                     <option value="medium">medium</option>
                     <option value="high">high</option>
+                </select>
+                <select id="mobile-sort" class="filter-select mobile-sort-select">
+                    <option value="stars:desc">★ Stars ↓</option>
+                    <option value="relevance_score:desc">Score ↓</option>
+                    <option value="my_rating:desc">Rating ↓</option>
+                    <option value="full_name:asc">Name A-Z</option>
+                    <option value="status:asc">Status</option>
                 </select>
             </div>
             <div class="filter-search-wrap">
