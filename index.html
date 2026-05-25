@@ -177,25 +177,46 @@
         <div id="filter-bar">
             <div class="filter-pills">
                 <span class="filter-label">FILTERS</span>
-                <select id="filter-category" class="filter-select">
-                    <option value="">Category</option>
-                </select>
-                <select id="filter-language" class="filter-select">
-                    <option value="">Language</option>
-                </select>
-                <select id="filter-status" class="filter-select">
-                    <option value="">Status</option>
-                    <option value="new">new</option>
-                    <option value="watch">watch</option>
-                    <option value="skip">skip</option>
-                    <option value="integrated">integrated</option>
-                </select>
-                <select id="filter-effort" class="filter-select">
-                    <option value="">Effort</option>
-                    <option value="low">low</option>
-                    <option value="medium">medium</option>
-                    <option value="high">high</option>
-                </select>
+                <div class="multiselect" id="filter-category" data-filter="category">
+                    <button class="multiselect-trigger" type="button">
+                        <span class="multiselect-label">Category</span>
+                        <span class="multiselect-count hidden">0</span>
+                        <span class="material-symbols-outlined multiselect-chevron">expand_more</span>
+                    </button>
+                    <div class="multiselect-popup hidden">
+                        <div class="multiselect-options"></div>
+                    </div>
+                </div>
+                <div class="multiselect" id="filter-language" data-filter="language">
+                    <button class="multiselect-trigger" type="button">
+                        <span class="multiselect-label">Language</span>
+                        <span class="multiselect-count hidden">0</span>
+                        <span class="material-symbols-outlined multiselect-chevron">expand_more</span>
+                    </button>
+                    <div class="multiselect-popup hidden">
+                        <div class="multiselect-options"></div>
+                    </div>
+                </div>
+                <div class="multiselect" id="filter-status" data-filter="status">
+                    <button class="multiselect-trigger" type="button">
+                        <span class="multiselect-label">Status</span>
+                        <span class="multiselect-count hidden">0</span>
+                        <span class="material-symbols-outlined multiselect-chevron">expand_more</span>
+                    </button>
+                    <div class="multiselect-popup hidden">
+                        <div class="multiselect-options"></div>
+                    </div>
+                </div>
+                <div class="multiselect" id="filter-effort" data-filter="effort">
+                    <button class="multiselect-trigger" type="button">
+                        <span class="multiselect-label">Effort</span>
+                        <span class="multiselect-count hidden">0</span>
+                        <span class="material-symbols-outlined multiselect-chevron">expand_more</span>
+                    </button>
+                    <div class="multiselect-popup hidden">
+                        <div class="multiselect-options"></div>
+                    </div>
+                </div>
                 <select id="mobile-sort" class="filter-select mobile-sort-select">
                     <option value="stars:desc">★ Stars ↓</option>
                     <option value="relevance_score:desc">Score ↓</option>

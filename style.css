@@ -409,13 +409,17 @@ body {
     padding: var(--sp-sm) var(--sp-md);
     border-bottom: 1px solid var(--border);
     flex-wrap: wrap;
+    overflow: visible;
+    position: relative;
+    z-index: 50;
 }
 .filter-pills {
     display: flex;
     align-items: center;
     gap: var(--sp-sm);
-    overflow-x: auto;
+    overflow: visible;
     flex: 1;
+    flex-wrap: wrap;
 }
 .filter-label {
     font-size: 11px;
@@ -444,6 +448,165 @@ body {
 }
 .filter-select:focus { border-color: var(--primary); }
 .filter-select option { background: var(--surface); color: var(--text); }
+
+/* --- Multiselect Component --- */
+.multiselect {
+    position: relative;
+}
+
+.multiselect-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 4px 6px 4px 8px;
+    cursor: pointer;
+    outline: none;
+    white-space: nowrap;
+    transition: border-color 0.15s, background 0.15s;
+}
+.multiselect-trigger:hover {
+    border-color: var(--text-secondary);
+}
+.multiselect-trigger.active {
+    border-color: var(--primary);
+    background: var(--primary-dim);
+    color: var(--primary);
+}
+.multiselect.open .multiselect-trigger {
+    border-color: var(--primary);
+}
+
+.multiselect-label {
+    pointer-events: none;
+}
+
+.multiselect-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: var(--primary);
+    color: var(--primary-text);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+    line-height: 1;
+}
+
+.multiselect-chevron {
+    font-size: 16px !important;
+    transition: transform 0.2s;
+    color: var(--text-secondary);
+    pointer-events: none;
+}
+.multiselect.open .multiselect-chevron {
+    transform: rotate(180deg);
+}
+
+.multiselect-popup {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 100;
+    min-width: 160px;
+    max-height: 240px;
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    padding: 4px;
+    animation: msPopIn 0.15s ease;
+}
+
+@keyframes msPopIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.multiselect-popup::-webkit-scrollbar {
+    width: 4px;
+}
+.multiselect-popup::-webkit-scrollbar-track {
+    background: transparent;
+}
+.multiselect-popup::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+}
+
+.multiselect-options {
+    display: flex;
+    flex-direction: column;
+}
+
+.multiselect-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.1s;
+    user-select: none;
+}
+.multiselect-option:hover {
+    background: var(--surface-high);
+}
+
+.multiselect-option input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    width: 0;
+    height: 0;
+}
+
+.multiselect-check {
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid var(--text-secondary);
+    border-radius: 3px;
+    flex-shrink: 0;
+    position: relative;
+    transition: all 0.15s;
+}
+.multiselect-option input:checked ~ .multiselect-check {
+    background: var(--primary);
+    border-color: var(--primary);
+}
+.multiselect-option input:checked ~ .multiselect-check::after {
+    content: '';
+    position: absolute;
+    left: 3.5px;
+    top: 1px;
+    width: 4px;
+    height: 7px;
+    border: solid var(--primary-text);
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(45deg);
+}
+
+.multiselect-option-text {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
 
 .filter-search-wrap {
     position: relative;
@@ -881,6 +1044,25 @@ tr.detail-row td { padding: 0; }
         flex: 1 1 auto;
         min-width: 0;
         font-size: 10px;
+    }
+    .multiselect-trigger {
+        min-height: 32px;
+        padding: 6px 8px;
+        font-size: 10px;
+    }
+    .multiselect-popup {
+        min-width: 140px;
+        max-height: 200px;
+    }
+    .multiselect-option {
+        padding: 8px 10px;
+    }
+    .multiselect-option-text {
+        font-size: 12px;
+    }
+    .multiselect-check {
+        width: 16px;
+        height: 16px;
     }
     .filter-search {
         height: 40px;

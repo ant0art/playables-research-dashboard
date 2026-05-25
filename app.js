@@ -23,7 +23,7 @@ let state = {
     notes: {},       // keyed by full_name
     sortCol: 'stars',
     sortDir: 'desc',
-    filters: {},
+    filters: JSON.parse(localStorage.getItem('pr_filters') || '{}'),
     searchQuery: '',
     expandedRow: null,
 };
@@ -404,18 +404,18 @@ function getFilteredRepos() {
         my_notes: state.notes[r.full_name]?.my_notes || '',
     }));
 
-    // Apply filters
-    if (state.filters.category) {
-        repos = repos.filter(r => r.category === state.filters.category);
+    // Apply multiselect filters (arrays)
+    if (state.filters.category && state.filters.category.length) {
+        repos = repos.filter(r => state.filters.category.includes(r.category));
     }
-    if (state.filters.language) {
-        repos = repos.filter(r => r.language === state.filters.language);
+    if (state.filters.language && state.filters.language.length) {
+        repos = repos.filter(r => state.filters.language.includes(r.language));
     }
-    if (state.filters.status) {
-        repos = repos.filter(r => r.status === state.filters.status);
+    if (state.filters.status && state.filters.status.length) {
+        repos = repos.filter(r => state.filters.status.includes(r.status));
     }
-    if (state.filters.effort) {
-        repos = repos.filter(r => r.integration_effort === state.filters.effort);
+    if (state.filters.effort && state.filters.effort.length) {
+        repos = repos.filter(r => state.filters.effort.includes(r.integration_effort));
     }
     if (state.searchQuery) {
         const q = state.searchQuery.toLowerCase();
@@ -442,15 +442,131 @@ function getFilteredRepos() {
 }
 
 function populateFilters() {
-    // Category
+    // Category — dynamic from data
     const cats = [...new Set(state.repos.map(r => r.category).filter(Boolean))].sort();
-    const catSel = $('filter-category');
-    catSel.innerHTML = '<option value="">Category</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+    populateMultiselect('filter-category', cats);
 
-    // Language
+    // Language — dynamic from data
     const langs = [...new Set(state.repos.map(r => r.language).filter(Boolean))].sort();
-    const langSel = $('filter-language');
-    langSel.innerHTML = '<option value="">Language</option>' + langs.map(l => `<option value="${l}">${l}</option>`).join('');
+    populateMultiselect('filter-language', langs);
+
+    // Status — fixed values
+    populateMultiselect('filter-status', ['new', 'watch', 'skip', 'integrated']);
+
+    // Effort — fixed values
+    populateMultiselect('filter-effort', ['low', 'medium', 'high']);
+
+    // Restore UI state from persisted filters
+    ['filter-category', 'filter-language', 'filter-status', 'filter-effort'].forEach(updateMultiselectUI);
+}
+
+// ============================================================
+// Multiselect Component
+// ============================================================
+
+function populateMultiselect(id, values) {
+    const container = $(id);
+    if (!container) return;
+    const optionsWrap = container.querySelector('.multiselect-options');
+    const filterKey = container.dataset.filter;
+    const selected = state.filters[filterKey] || [];
+
+    optionsWrap.innerHTML = values.map(v => {
+        const checked = selected.includes(v) ? 'checked' : '';
+        return `<label class="multiselect-option">
+            <input type="checkbox" value="${v}" ${checked}>
+            <span class="multiselect-check"></span>
+            <span class="multiselect-option-text">${v}</span>
+        </label>`;
+    }).join('');
+
+    // Bind checkbox events
+    optionsWrap.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', () => {
+            onMultiselectChange(id);
+        });
+    });
+}
+
+function onMultiselectChange(id) {
+    const container = $(id);
+    const filterKey = container.dataset.filter;
+    const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+    const values = Array.from(checkboxes).map(cb => cb.value);
+
+    state.filters[filterKey] = values;
+    localStorage.setItem('pr_filters', JSON.stringify(state.filters));
+    updateMultiselectUI(id);
+    renderAll();
+}
+
+function updateMultiselectUI(id) {
+    const container = $(id);
+    const filterKey = container.dataset.filter;
+    const selected = state.filters[filterKey] || [];
+    const countEl = container.querySelector('.multiselect-count');
+    const trigger = container.querySelector('.multiselect-trigger');
+
+    if (selected.length > 0) {
+        countEl.textContent = selected.length;
+        countEl.classList.remove('hidden');
+        trigger.classList.add('active');
+    } else {
+        countEl.classList.add('hidden');
+        trigger.classList.remove('active');
+    }
+}
+
+function initMultiselects() {
+    // Toggle popup on trigger click
+    document.querySelectorAll('.multiselect-trigger').forEach(trigger => {
+        trigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const container = trigger.closest('.multiselect');
+            const popup = container.querySelector('.multiselect-popup');
+            const isOpen = !popup.classList.contains('hidden');
+
+            // Close all others first
+            closeAllMultiselects();
+
+            if (!isOpen) {
+                popup.style.left = '';
+                popup.style.right = '';
+                popup.classList.remove('hidden');
+                container.classList.add('open');
+
+                // Keep popup within viewport
+                requestAnimationFrame(() => {
+                    const rect = popup.getBoundingClientRect();
+                    if (rect.right > window.innerWidth) {
+                        popup.style.left = 'auto';
+                        popup.style.right = '0';
+                    }
+                    if (rect.left < 0) {
+                        popup.style.left = '0';
+                        popup.style.right = 'auto';
+                    }
+                });
+            }
+        });
+    });
+
+    // Prevent popup clicks from closing
+    document.querySelectorAll('.multiselect-popup').forEach(popup => {
+        popup.addEventListener('click', (e) => e.stopPropagation());
+    });
+
+    // Close on outside click
+    document.addEventListener('click', () => {
+        closeAllMultiselects();
+    });
+}
+
+function closeAllMultiselects() {
+    document.querySelectorAll('.multiselect').forEach(ms => {
+        ms.querySelector('.multiselect-popup').classList.add('hidden');
+        ms.classList.remove('open');
+    });
 }
 
 // ============================================================
@@ -710,11 +826,8 @@ function bindEvents() {
     });
     $('btn-signout-mobile').addEventListener('click', signOut);
 
-    // Filters
-    $('filter-category').addEventListener('change', (e) => { state.filters.category = e.target.value; renderAll(); });
-    $('filter-language').addEventListener('change', (e) => { state.filters.language = e.target.value; renderAll(); });
-    $('filter-status').addEventListener('change', (e) => { state.filters.status = e.target.value; renderAll(); });
-    $('filter-effort').addEventListener('change', (e) => { state.filters.effort = e.target.value; renderAll(); });
+    // Multiselect init
+    initMultiselects();
 
     // Mobile sort
     $('mobile-sort').addEventListener('change', (e) => {
