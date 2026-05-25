@@ -1045,7 +1045,9 @@ function utcHourToLocal(utcHour) {
 }
 
 function updateLocalTimeLabel(utcHour) {
-    $('local-time-display').textContent = `≈ ${utcHourToLocal(utcHour)} local time`;
+    const startLocal = utcHourToLocal(utcHour);
+    const endLocal = utcHourToLocal((utcHour + 1) % 24);
+    $('local-time-display').textContent = `≈ ${startLocal}–${endLocal} local time`;
 }
 
 function setScheduleStatusText(enabled) {
