@@ -10,7 +10,7 @@ const CONFIG = {
     SHEETS_API: 'https://sheets.googleapis.com/v4/spreadsheets',
     DRIVE_API: 'https://www.googleapis.com/drive/v3/files',
     STORAGE_KEY: 'pr_sheet_id',
-    REPOS_HEADERS: ['full_name','url','stars','language','category','relevance_score','summary_ru','application','limitations','integration_effort','worth_tracking','found_date'],
+    REPOS_HEADERS: ['full_name','url','stars','language','category','relevance_score','summary_ru','application','limitations','integration_effort','worth_tracking','found_date','recommendation','bundle_impact','code_quality_score','architecture_summary'],
     NOTES_HEADERS: ['full_name','my_rating','status','my_notes','reviewed_at'],
 };
 
@@ -310,7 +310,7 @@ async function loadSheetData() {
     showLoading(true);
     try {
         // Batch get both sheets
-        const data = await sheetsRequest('/values:batchGet?ranges=Repos!A1:L1000&ranges=MyNotes!A1:E1000');
+        const data = await sheetsRequest('/values:batchGet?ranges=Repos!A1:P1000&ranges=MyNotes!A1:E1000');
         const ranges = data.valueRanges || [];
 
         // Parse Repos
@@ -322,6 +322,7 @@ async function loadSheetData() {
                 headers.forEach((h, i) => { obj[h] = row[i] || ''; });
                 obj.stars = parseInt(obj.stars, 10) || 0;
                 obj.relevance_score = parseInt(obj.relevance_score, 10) || 0;
+                obj.code_quality_score = parseInt(obj.code_quality_score, 10) || 0;
                 return obj;
             });
         } else {
@@ -640,6 +641,56 @@ function formatStars(n) {
     return String(n);
 }
 
+function renderCodeAnalysisSection(repo) {
+    // Only show if code analysis data exists
+    if (!repo.recommendation) return '';
+
+    const recLabels = {
+        'use': { text: '✅ Use', cls: 'ca-rec-use' },
+        'evaluate': { text: '🟡 Evaluate', cls: 'ca-rec-evaluate' },
+        'skip': { text: '🔴 Skip', cls: 'ca-rec-skip' },
+    };
+    const rec = recLabels[(repo.recommendation || '').toLowerCase()] || { text: repo.recommendation, cls: '' };
+
+    const bundleLabels = {
+        'low': { text: 'Low', cls: 'ca-bundle-low' },
+        'medium': { text: 'Medium', cls: 'ca-bundle-medium' },
+        'high': { text: 'High', cls: 'ca-bundle-high' },
+    };
+    const bundle = bundleLabels[(repo.bundle_impact || '').toLowerCase()] || { text: repo.bundle_impact || '-', cls: '' };
+
+    const quality = repo.code_quality_score || 0;
+    const qualityCls = quality >= 70 ? 'ca-quality-high' : quality >= 40 ? 'ca-quality-mid' : 'ca-quality-low';
+
+    return `<div class="code-analysis-panel">
+        <div class="ca-header">
+            <span class="material-symbols-outlined" style="font-size:16px;color:var(--accent)">code</span>
+            <span class="detail-section-title" style="margin:0">Deep Code Analysis</span>
+        </div>
+        <div class="ca-grid">
+            <div class="ca-item">
+                <div class="ca-label">Recommendation</div>
+                <span class="ca-badge ${rec.cls}">${rec.text}</span>
+            </div>
+            <div class="ca-item">
+                <div class="ca-label">Bundle Impact</div>
+                <span class="ca-badge ${bundle.cls}">${bundle.text}</span>
+            </div>
+            <div class="ca-item">
+                <div class="ca-label">Code Quality</div>
+                <div class="ca-quality-bar">
+                    <div class="ca-quality-fill ${qualityCls}" style="width:${quality}%"></div>
+                    <span class="ca-quality-text">${quality}/100</span>
+                </div>
+            </div>
+        </div>
+        ${repo.architecture_summary ? `<div class="ca-arch">
+            <div class="ca-label">Architecture</div>
+            <div class="detail-app">${repo.architecture_summary}</div>
+        </div>` : ''}
+    </div>`;
+}
+
 // --- Desktop Table ---
 
 function renderTable(repos) {
@@ -674,10 +725,10 @@ function renderDetailRow(repo) {
     return `<tr class="detail-row" data-detail="${repo.full_name}">
         <td colspan="8">
             <div class="detail-panel">
-                <div>
+                <div class="detail-content">
                     <div class="detail-section-title">Review</div>
                     <p class="detail-text">${repo.summary_ru || 'No review available'}</p>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+                    <div class="detail-app-grid">
                         <div>
                             <div class="detail-section-title">Application</div>
                             <div class="detail-app">${repo.application || '-'}</div>
@@ -687,13 +738,16 @@ function renderDetailRow(repo) {
                             <div class="detail-app" style="color:var(--text-secondary)">${repo.limitations || '-'}</div>
                         </div>
                     </div>
+                    ${renderCodeAnalysisSection(repo)}
                 </div>
-                <div class="notes-panel">
-                    <div class="notes-header">
-                        <span>My Notes</span>
-                        <span class="material-symbols-outlined" style="font-size:14px">edit_document</span>
+                <div class="detail-sidebar">
+                    <div class="notes-panel">
+                        <div class="notes-header">
+                            <span>My Notes</span>
+                            <span class="material-symbols-outlined" style="font-size:14px">edit_document</span>
+                        </div>
+                        <textarea class="notes-textarea" data-repo="${repo.full_name}" placeholder="Add your notes...">${repo.my_notes || ''}</textarea>
                     </div>
-                    <textarea class="notes-textarea" data-repo="${repo.full_name}" placeholder="Add your notes...">${repo.my_notes || ''}</textarea>
                 </div>
                 <div class="detail-footer">
                     <div class="detail-footer-left">
@@ -761,6 +815,7 @@ function renderMobileCardBody(repo) {
             <div class="mobile-card-section-title">Limitations</div>
             <div class="detail-app" style="color:var(--text-secondary)">${repo.limitations || '-'}</div>
         </div>
+        ${renderCodeAnalysisSection(repo)}
         <div class="mobile-card-section">
             <div class="mobile-card-section-title">My Notes</div>
             <textarea class="notes-textarea" data-repo="${repo.full_name}" placeholder="Add your notes..." style="min-height:60px;border:1px solid var(--border);border-radius:4px;background:var(--surface-low)">${repo.my_notes || ''}</textarea>
