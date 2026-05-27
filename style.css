@@ -220,6 +220,21 @@ body {
 }
 .btn-icon:hover { background: var(--surface-highest); color: var(--primary); }
 
+/* Language toggle */
+#btn-lang {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    min-width: 32px;
+    color: var(--text-secondary);
+    transition: color 0.15s, background 0.15s;
+}
+#btn-lang:hover {
+    color: var(--primary);
+    background: var(--surface-highest);
+}
+
 /* --- Sheet Picker Screen --- */
 .sheet-container {
     display: flex;

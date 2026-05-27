@@ -51,9 +51,195 @@ function toggleTheme() {
     applyTheme(current === 'dark' ? 'light' : 'dark');
 }
 
+// --- i18n ---
+const I18N = {
+    en: {
+        // Auth
+        auth_description: 'GitHub repository research dashboard for playable ads development',
+        auth_signin: 'Sign in with Google',
+        // Sheet picker
+        sheet_connect: 'Connect a Sheet',
+        sheet_choose: 'Choose from Drive',
+        sheet_choose_desc: 'Select an existing spreadsheet',
+        sheet_paste: 'Paste Sheet URL or ID',
+        sheet_btn_connect: 'Connect',
+        sheet_your: 'Your Spreadsheets',
+        sheet_loading: 'Loading...',
+        sheet_signout: 'Sign out',
+        // Nav
+        nav_switch: 'Switch Sheet',
+        nav_signout: 'Sign out',
+        // Mobile menu
+        menu_settings: 'Pipeline Settings',
+        menu_switch: 'Switch Sheet',
+        menu_signout: 'Sign out',
+        // Settings
+        settings_title: 'Pipeline Settings',
+        settings_github: 'GitHub Connection',
+        settings_pat: 'Personal Access Token',
+        settings_schedule: 'Schedule',
+        settings_active: 'Active',
+        settings_paused: 'Paused',
+        settings_daily: 'Daily at',
+        settings_save_schedule: 'Save Schedule',
+        settings_manual: 'Manual Run',
+        settings_run: 'Run Research Now',
+        // Filters
+        filters_label: 'FILTERS',
+        filter_category: 'Category',
+        filter_language: 'Language',
+        filter_status: 'Status',
+        filter_effort: 'Effort',
+        filter_search: 'Search repos...',
+        // Mobile sort
+        sort_stars: '★ Stars ↓',
+        sort_score: 'Score ↓',
+        sort_rating: 'Rating ↓',
+        sort_name: 'Name A-Z',
+        sort_status: 'Status',
+        // Table headers
+        th_name: 'Name',
+        th_stars: 'Stars',
+        th_category: 'Category',
+        th_score: 'Score',
+        th_rating: 'My Rating',
+        th_status: 'Status',
+        th_effort: 'Effort',
+        // Stats
+        stat_repos: 'repos',
+        stat_shown: 'shown',
+        stat_watched: 'watched',
+        // Detail panel
+        detail_review: 'Review',
+        detail_no_review: 'No review available',
+        detail_application: 'Application',
+        detail_limitations: 'Limitations',
+        detail_notes: 'My Notes',
+        detail_notes_placeholder: 'Add your notes...',
+        detail_github: 'View on GitHub',
+        // Code analysis
+        ca_title: 'Deep Code Analysis',
+        ca_recommendation: 'Recommendation',
+        ca_bundle: 'Bundle Impact',
+        ca_quality: 'Code Quality',
+        ca_architecture: 'Architecture',
+        // Empty / Loading
+        empty_text: 'No repositories found',
+        loading_text: 'Loading data from Google Sheets...',
+        // Mobile
+        mobile_github: 'GitHub',
+    },
+    ru: {
+        auth_description: 'Панель исследования GitHub-репозиториев для разработки playable ads',
+        auth_signin: 'Войти через Google',
+        sheet_connect: 'Подключить таблицу',
+        sheet_choose: 'Выбрать из Drive',
+        sheet_choose_desc: 'Выберите существующую таблицу',
+        sheet_paste: 'Вставьте URL или ID таблицы',
+        sheet_btn_connect: 'Подключить',
+        sheet_your: 'Ваши таблицы',
+        sheet_loading: 'Загрузка...',
+        sheet_signout: 'Выйти',
+        nav_switch: 'Сменить таблицу',
+        nav_signout: 'Выйти',
+        menu_settings: 'Настройки пайплайна',
+        menu_switch: 'Сменить таблицу',
+        menu_signout: 'Выйти',
+        settings_title: 'Настройки пайплайна',
+        settings_github: 'GitHub подключение',
+        settings_pat: 'Personal Access Token',
+        settings_schedule: 'Расписание',
+        settings_active: 'Активно',
+        settings_paused: 'На паузе',
+        settings_daily: 'Ежедневно в',
+        settings_save_schedule: 'Сохранить расписание',
+        settings_manual: 'Ручной запуск',
+        settings_run: 'Запустить исследование',
+        filters_label: 'ФИЛЬТРЫ',
+        filter_category: 'Категория',
+        filter_language: 'Язык',
+        filter_status: 'Статус',
+        filter_effort: 'Сложность',
+        filter_search: 'Поиск репо...',
+        sort_stars: '★ Звёзды ↓',
+        sort_score: 'Оценка ↓',
+        sort_rating: 'Рейтинг ↓',
+        sort_name: 'Имя A-Z',
+        sort_status: 'Статус',
+        th_name: 'Название',
+        th_stars: 'Звёзды',
+        th_category: 'Категория',
+        th_score: 'Оценка',
+        th_rating: 'Мой рейтинг',
+        th_status: 'Статус',
+        th_effort: 'Сложность',
+        stat_repos: 'репо',
+        stat_shown: 'показано',
+        stat_watched: 'отслеж.',
+        detail_review: 'Обзор',
+        detail_no_review: 'Обзор отсутствует',
+        detail_application: 'Применение',
+        detail_limitations: 'Ограничения',
+        detail_notes: 'Мои заметки',
+        detail_notes_placeholder: 'Добавьте заметки...',
+        detail_github: 'На GitHub',
+        ca_title: 'Глубокий анализ кода',
+        ca_recommendation: 'Рекомендация',
+        ca_bundle: 'Влияние на бандл',
+        ca_quality: 'Качество кода',
+        ca_architecture: 'Архитектура',
+        empty_text: 'Репозитории не найдены',
+        loading_text: 'Загрузка данных из Google Sheets...',
+        mobile_github: 'GitHub',
+    }
+};
+
+let currentLang = localStorage.getItem('pr_lang') || 'en';
+
+function t(key) {
+    return (I18N[currentLang] || I18N.en)[key] || I18N.en[key] || key;
+}
+
+function initLang() {
+    applyLang(currentLang);
+}
+
+function applyLang(lang) {
+    currentLang = lang;
+    localStorage.setItem('pr_lang', lang);
+
+    // Update html lang attribute
+    document.documentElement.lang = lang;
+
+    // Update all elements with data-i18n attribute
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        el.textContent = t(el.dataset.i18n);
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        el.placeholder = t(el.dataset.i18nPlaceholder);
+    });
+
+    // Update lang toggle button
+    const langBtn = $('btn-lang');
+    if (langBtn) {
+        langBtn.textContent = lang === 'ru' ? 'EN' : 'RU';
+        langBtn.title = lang === 'ru' ? 'Switch to English' : 'Переключить на русский';
+    }
+
+    // Re-render dynamic content if dashboard is visible
+    if (!$('dashboard-screen').classList.contains('hidden')) {
+        renderAll();
+    }
+}
+
+function toggleLang() {
+    applyLang(currentLang === 'en' ? 'ru' : 'en');
+}
+
 // --- Init ---
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
+    initLang();
     loadGoogleIdentity();
     bindEvents();
     bindSettingsEvents();
@@ -588,9 +774,9 @@ function renderAll() {
 function renderStats(repos) {
     const total = state.repos.length;
     const watched = Object.values(state.notes).filter(n => n.status === 'watch').length;
-    $('stat-total').textContent = `${total} repos`;
-    $('stat-filtered').textContent = `${repos.length} shown`;
-    $('stat-watched').textContent = `${watched} watched`;
+    $('stat-total').textContent = `${total} ${t('stat_repos')}`;
+    $('stat-filtered').textContent = `${repos.length} ${t('stat_shown')}`;
+    $('stat-watched').textContent = `${watched} ${t('stat_watched')}`;
 }
 
 function renderSortHeaders() {
@@ -665,19 +851,19 @@ function renderCodeAnalysisSection(repo) {
     return `<div class="code-analysis-panel">
         <div class="ca-header">
             <span class="material-symbols-outlined" style="font-size:16px;color:var(--accent)">code</span>
-            <span class="detail-section-title" style="margin:0">Deep Code Analysis</span>
+            <span class="detail-section-title" style="margin:0">${t('ca_title')}</span>
         </div>
         <div class="ca-grid">
             <div class="ca-item">
-                <div class="ca-label">Recommendation</div>
+                <div class="ca-label">${t('ca_recommendation')}</div>
                 <span class="ca-badge ${rec.cls}">${rec.text}</span>
             </div>
             <div class="ca-item">
-                <div class="ca-label">Bundle Impact</div>
+                <div class="ca-label">${t('ca_bundle')}</div>
                 <span class="ca-badge ${bundle.cls}">${bundle.text}</span>
             </div>
             <div class="ca-item">
-                <div class="ca-label">Code Quality</div>
+                <div class="ca-label">${t('ca_quality')}</div>
                 <div class="ca-quality-bar">
                     <div class="ca-quality-fill ${qualityCls}" style="width:${quality}%"></div>
                     <span class="ca-quality-text">${quality}/100</span>
@@ -685,7 +871,7 @@ function renderCodeAnalysisSection(repo) {
             </div>
         </div>
         ${repo.architecture_summary ? `<div class="ca-arch">
-            <div class="ca-label">Architecture</div>
+            <div class="ca-label">${t('ca_architecture')}</div>
             <div class="detail-app">${repo.architecture_summary}</div>
         </div>` : ''}
     </div>`;
@@ -726,15 +912,15 @@ function renderDetailRow(repo) {
         <td colspan="8">
             <div class="detail-panel">
                 <div class="detail-content">
-                    <div class="detail-section-title">Review</div>
-                    <p class="detail-text">${repo.summary_ru || 'No review available'}</p>
+                    <div class="detail-section-title">${t('detail_review')}</div>
+                    <p class="detail-text">${repo.summary_ru || t('detail_no_review')}</p>
                     <div class="detail-app-grid">
                         <div>
-                            <div class="detail-section-title">Application</div>
+                            <div class="detail-section-title">${t('detail_application')}</div>
                             <div class="detail-app">${repo.application || '-'}</div>
                         </div>
                         <div>
-                            <div class="detail-section-title">Limitations</div>
+                            <div class="detail-section-title">${t('detail_limitations')}</div>
                             <div class="detail-app" style="color:var(--text-secondary)">${repo.limitations || '-'}</div>
                         </div>
                     </div>
@@ -743,10 +929,10 @@ function renderDetailRow(repo) {
                 <div class="detail-sidebar">
                     <div class="notes-panel">
                         <div class="notes-header">
-                            <span>My Notes</span>
+                            <span>${t('detail_notes')}</span>
                             <span class="material-symbols-outlined" style="font-size:14px">edit_document</span>
                         </div>
-                        <textarea class="notes-textarea" data-repo="${repo.full_name}" placeholder="Add your notes...">${repo.my_notes || ''}</textarea>
+                        <textarea class="notes-textarea" data-repo="${repo.full_name}" placeholder="${t('detail_notes_placeholder')}">${repo.my_notes || ''}</textarea>
                     </div>
                 </div>
                 <div class="detail-footer">
@@ -760,7 +946,7 @@ function renderDetailRow(repo) {
                     </div>
                     <a class="btn-github" href="${repo.url || 'https://github.com/' + repo.full_name}" target="_blank" rel="noopener">
                         <span class="material-symbols-outlined" style="font-size:14px">open_in_new</span>
-                        View on GitHub
+                        ${t('detail_github')}
                     </a>
                 </div>
             </div>
@@ -804,21 +990,21 @@ function renderMobileCards(repos) {
 function renderMobileCardBody(repo) {
     return `<div class="mobile-card-body" style="display:block">
         <div class="mobile-card-section">
-            <div class="mobile-card-section-title">Review</div>
-            <p class="detail-text">${repo.summary_ru || 'No review available'}</p>
+            <div class="mobile-card-section-title">${t('detail_review')}</div>
+            <p class="detail-text">${repo.summary_ru || t('detail_no_review')}</p>
         </div>
         <div class="mobile-card-section">
-            <div class="mobile-card-section-title">Application</div>
+            <div class="mobile-card-section-title">${t('detail_application')}</div>
             <div class="detail-app">${repo.application || '-'}</div>
         </div>
         <div class="mobile-card-section">
-            <div class="mobile-card-section-title">Limitations</div>
+            <div class="mobile-card-section-title">${t('detail_limitations')}</div>
             <div class="detail-app" style="color:var(--text-secondary)">${repo.limitations || '-'}</div>
         </div>
         ${renderCodeAnalysisSection(repo)}
         <div class="mobile-card-section">
-            <div class="mobile-card-section-title">My Notes</div>
-            <textarea class="notes-textarea" data-repo="${repo.full_name}" placeholder="Add your notes..." style="min-height:60px;border:1px solid var(--border);border-radius:4px;background:var(--surface-low)">${repo.my_notes || ''}</textarea>
+            <div class="mobile-card-section-title">${t('detail_notes')}</div>
+            <textarea class="notes-textarea" data-repo="${repo.full_name}" placeholder="${t('detail_notes_placeholder')}" style="min-height:60px;border:1px solid var(--border);border-radius:4px;background:var(--surface-low)">${repo.my_notes || ''}</textarea>
         </div>
         <div class="mobile-card-actions">
             <select class="detail-status-select" data-repo="${repo.full_name}">
@@ -829,7 +1015,7 @@ function renderMobileCardBody(repo) {
             ${starsHTML(repo.my_rating, repo.full_name)}
             <a class="btn-github" href="${repo.url || 'https://github.com/' + repo.full_name}" target="_blank" rel="noopener">
                 <span class="material-symbols-outlined" style="font-size:14px">open_in_new</span>
-                GitHub
+                ${t('mobile_github')}
             </a>
         </div>
     </div>`;

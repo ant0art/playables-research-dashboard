@@ -19,10 +19,10 @@
                 <span class="material-symbols-outlined" style="font-size:32px;color:var(--primary)">terminal</span>
                 <span class="auth-title">playables.research</span>
             </div>
-            <p class="auth-description">GitHub repository research dashboard for playable ads development</p>
+            <p class="auth-description" data-i18n="auth_description">GitHub repository research dashboard for playable ads development</p>
             <button id="btn-signin" class="btn-primary auth-btn">
                 <span class="material-symbols-outlined">login</span>
-                Sign in with Google
+                <span data-i18n="auth_signin">Sign in with Google</span>
             </button>
         </div>
     </div>
@@ -32,33 +32,33 @@
         <div class="sheet-container">
             <div class="sheet-header">
                 <span class="material-symbols-outlined" style="color:var(--primary)">table_chart</span>
-                <h2>Connect a Sheet</h2>
+                <h2 data-i18n="sheet_connect">Connect a Sheet</h2>
             </div>
             <div class="sheet-options">
                 <button id="btn-pick-sheet" class="sheet-option">
                     <span class="material-symbols-outlined">folder_open</span>
                     <div>
-                        <strong>Choose from Drive</strong>
-                        <span class="sheet-option-desc">Select an existing spreadsheet</span>
+                        <strong data-i18n="sheet_choose">Choose from Drive</strong>
+                        <span class="sheet-option-desc" data-i18n="sheet_choose_desc">Select an existing spreadsheet</span>
                     </div>
                 </button>
                 <div class="sheet-option-manual">
                     <span class="material-symbols-outlined">link</span>
-                    <input id="input-sheet-id" type="text" placeholder="Paste Sheet URL or ID">
-                    <button id="btn-connect-sheet" class="btn-secondary">Connect</button>
+                    <input id="input-sheet-id" type="text" data-i18n-placeholder="sheet_paste" placeholder="Paste Sheet URL or ID">
+                    <button id="btn-connect-sheet" class="btn-secondary" data-i18n="sheet_btn_connect">Connect</button>
                 </div>
             </div>
             <!-- Drive list (hidden by default) -->
             <div id="drive-list" class="drive-list hidden">
                 <div class="drive-list-header">
-                    <span class="detail-section-title">Your Spreadsheets</span>
+                    <span class="detail-section-title" data-i18n="sheet_your">Your Spreadsheets</span>
                     <button id="btn-drive-close" class="btn-icon"><span class="material-symbols-outlined">close</span></button>
                 </div>
                 <div id="drive-list-items" class="drive-list-items">
-                    <div class="loading-state"><div class="spinner"></div><p>Loading...</p></div>
+                    <div class="loading-state"><div class="spinner"></div><p data-i18n="sheet_loading">Loading...</p></div>
                 </div>
             </div>
-            <button id="btn-signout-sheet" class="btn-ghost">Sign out</button>
+            <button id="btn-signout-sheet" class="btn-ghost" data-i18n="sheet_signout">Sign out</button>
         </div>
     </div>
 
@@ -76,13 +76,14 @@
             <div class="nav-right">
                 <button id="btn-switch-sheet" class="btn-secondary nav-btn-desktop">
                     <span class="material-symbols-outlined">swap_horiz</span>
-                    Switch Sheet
+                    <span data-i18n="nav_switch">Switch Sheet</span>
                 </button>
                 <button id="btn-settings" class="btn-icon" title="Pipeline settings">
                     <span class="material-symbols-outlined">settings</span>
                 </button>
                 <span id="user-name" class="nav-user nav-btn-desktop"></span>
-                <button id="btn-signout" class="btn-ghost nav-btn-desktop">Sign out</button>
+                <button id="btn-signout" class="btn-ghost nav-btn-desktop" data-i18n="nav_signout">Sign out</button>
+                <button id="btn-lang" class="btn-icon" title="Switch language" onclick="toggleLang()">RU</button>
                 <button id="btn-theme" class="btn-icon" title="Toggle theme">
                     <span class="material-symbols-outlined">light_mode</span>
                 </button>
@@ -95,13 +96,13 @@
         <!-- Mobile menu -->
         <div id="mobile-menu" class="mobile-menu hidden">
             <button id="btn-settings-mobile" class="mobile-menu-item">
-                <span class="material-symbols-outlined">settings</span> Pipeline Settings
+                <span class="material-symbols-outlined">settings</span> <span data-i18n="menu_settings">Pipeline Settings</span>
             </button>
             <button id="btn-switch-sheet-mobile" class="mobile-menu-item">
-                <span class="material-symbols-outlined">swap_horiz</span> Switch Sheet
+                <span class="material-symbols-outlined">swap_horiz</span> <span data-i18n="menu_switch">Switch Sheet</span>
             </button>
             <button id="btn-signout-mobile" class="mobile-menu-item">
-                <span class="material-symbols-outlined">logout</span> Sign out
+                <span class="material-symbols-outlined">logout</span> <span data-i18n="menu_signout">Sign out</span>
             </button>
         </div>
 
@@ -111,7 +112,7 @@
                 <div class="settings-header">
                     <div class="settings-title">
                         <span class="material-symbols-outlined">settings</span>
-                        <h2>Pipeline Settings</h2>
+                        <h2 data-i18n="settings_title">Pipeline Settings</h2>
                     </div>
                     <button id="btn-close-settings" class="btn-icon">
                         <span class="material-symbols-outlined">close</span>
@@ -120,9 +121,9 @@
                 <div class="settings-body">
                     <!-- GitHub Connection -->
                     <div class="settings-section">
-                        <div class="settings-section-label">GitHub Connection</div>
+                        <div class="settings-section-label" data-i18n="settings_github">GitHub Connection</div>
                         <div class="settings-card">
-                            <label class="settings-field-label">Personal Access Token</label>
+                            <label class="settings-field-label" data-i18n="settings_pat">Personal Access Token</label>
                             <div class="settings-pat-row">
                                 <input id="input-github-pat" type="password" class="settings-input" placeholder="ghp_..." autocomplete="off">
                                 <button id="btn-save-pat" class="btn-secondary btn-sm" title="Save token">
@@ -135,24 +136,24 @@
 
                     <!-- Schedule -->
                     <div class="settings-section" id="section-schedule">
-                        <div class="settings-section-label">Schedule</div>
+                        <div class="settings-section-label" data-i18n="settings_schedule">Schedule</div>
                         <div class="settings-card">
                             <div class="settings-toggle-row">
-                                <span id="schedule-status-text" class="schedule-status active">Active</span>
+                                <span id="schedule-status-text" class="schedule-status active" data-i18n="settings_active">Active</span>
                                 <label class="toggle">
                                     <input type="checkbox" id="toggle-schedule-enabled" checked>
                                     <span class="toggle-slider"></span>
                                 </label>
                             </div>
                             <div class="settings-time-row">
-                                <span class="settings-field-label">Daily at</span>
+                                <span class="settings-field-label" data-i18n="settings_daily">Daily at</span>
                                 <select id="select-schedule-hour" class="settings-select"></select>
                                 <span class="settings-time-utc">:00 UTC</span>
                             </div>
                             <div id="local-time-display" class="settings-local-time"></div>
                             <button id="btn-save-schedule" class="btn-save-schedule hidden">
                                 <span class="material-symbols-outlined">save</span>
-                                Save Schedule
+                                <span data-i18n="settings_save_schedule">Save Schedule</span>
                             </button>
                             <div id="schedule-status" class="settings-status"></div>
                         </div>
@@ -160,11 +161,11 @@
 
                     <!-- Manual Run -->
                     <div class="settings-section" id="section-run">
-                        <div class="settings-section-label">Manual Run</div>
+                        <div class="settings-section-label" data-i18n="settings_manual">Manual Run</div>
                         <div class="settings-card">
                             <button id="btn-run-now" class="btn-run-now">
                                 <span class="material-symbols-outlined">play_arrow</span>
-                                Run Research Now
+                                <span data-i18n="settings_run">Run Research Now</span>
                             </button>
                             <div id="last-run-info" class="settings-last-run"></div>
                         </div>
@@ -176,10 +177,10 @@
         <!-- Filters -->
         <div id="filter-bar">
             <div class="filter-pills">
-                <span class="filter-label">FILTERS</span>
+                <span class="filter-label" data-i18n="filters_label">FILTERS</span>
                 <div class="multiselect" id="filter-category" data-filter="category">
                     <button class="multiselect-trigger" type="button">
-                        <span class="multiselect-label">Category</span>
+                        <span class="multiselect-label" data-i18n="filter_category">Category</span>
                         <span class="multiselect-count hidden">0</span>
                         <span class="material-symbols-outlined multiselect-chevron">expand_more</span>
                     </button>
@@ -189,7 +190,7 @@
                 </div>
                 <div class="multiselect" id="filter-language" data-filter="language">
                     <button class="multiselect-trigger" type="button">
-                        <span class="multiselect-label">Language</span>
+                        <span class="multiselect-label" data-i18n="filter_language">Language</span>
                         <span class="multiselect-count hidden">0</span>
                         <span class="material-symbols-outlined multiselect-chevron">expand_more</span>
                     </button>
@@ -199,7 +200,7 @@
                 </div>
                 <div class="multiselect" id="filter-status" data-filter="status">
                     <button class="multiselect-trigger" type="button">
-                        <span class="multiselect-label">Status</span>
+                        <span class="multiselect-label" data-i18n="filter_status">Status</span>
                         <span class="multiselect-count hidden">0</span>
                         <span class="material-symbols-outlined multiselect-chevron">expand_more</span>
                     </button>
@@ -209,7 +210,7 @@
                 </div>
                 <div class="multiselect" id="filter-effort" data-filter="effort">
                     <button class="multiselect-trigger" type="button">
-                        <span class="multiselect-label">Effort</span>
+                        <span class="multiselect-label" data-i18n="filter_effort">Effort</span>
                         <span class="multiselect-count hidden">0</span>
                         <span class="material-symbols-outlined multiselect-chevron">expand_more</span>
                     </button>
@@ -218,16 +219,16 @@
                     </div>
                 </div>
                 <select id="mobile-sort" class="filter-select mobile-sort-select">
-                    <option value="stars:desc">★ Stars ↓</option>
-                    <option value="relevance_score:desc">Score ↓</option>
-                    <option value="my_rating:desc">Rating ↓</option>
-                    <option value="full_name:asc">Name A-Z</option>
-                    <option value="status:asc">Status</option>
+                    <option value="stars:desc" data-i18n="sort_stars">★ Stars ↓</option>
+                    <option value="relevance_score:desc" data-i18n="sort_score">Score ↓</option>
+                    <option value="my_rating:desc" data-i18n="sort_rating">Rating ↓</option>
+                    <option value="full_name:asc" data-i18n="sort_name">Name A-Z</option>
+                    <option value="status:asc" data-i18n="sort_status">Status</option>
                 </select>
             </div>
             <div class="filter-search-wrap">
                 <span class="material-symbols-outlined filter-search-icon">search</span>
-                <input id="filter-search" type="text" class="filter-search" placeholder="Search repos...">
+                <input id="filter-search" type="text" class="filter-search" data-i18n-placeholder="filter_search" placeholder="Search repos...">
             </div>
         </div>
 
@@ -246,24 +247,24 @@
                 <thead>
                     <tr>
                         <th class="col-expand"></th>
-                        <th class="col-name sortable" data-sort="full_name">Name <span class="sort-arrow"></span></th>
-                        <th class="col-stars sortable" data-sort="stars">Stars <span class="sort-arrow"></span></th>
-                        <th class="col-cat sortable" data-sort="category">Category <span class="sort-arrow"></span></th>
-                        <th class="col-score sortable" data-sort="relevance_score">Score <span class="sort-arrow"></span></th>
-                        <th class="col-rating sortable" data-sort="my_rating">My Rating <span class="sort-arrow"></span></th>
-                        <th class="col-status sortable" data-sort="status">Status <span class="sort-arrow"></span></th>
-                        <th class="col-effort sortable" data-sort="integration_effort">Effort <span class="sort-arrow"></span></th>
+                        <th class="col-name sortable" data-sort="full_name"><span data-i18n="th_name">Name</span> <span class="sort-arrow"></span></th>
+                        <th class="col-stars sortable" data-sort="stars"><span data-i18n="th_stars">Stars</span> <span class="sort-arrow"></span></th>
+                        <th class="col-cat sortable" data-sort="category"><span data-i18n="th_category">Category</span> <span class="sort-arrow"></span></th>
+                        <th class="col-score sortable" data-sort="relevance_score"><span data-i18n="th_score">Score</span> <span class="sort-arrow"></span></th>
+                        <th class="col-rating sortable" data-sort="my_rating"><span data-i18n="th_rating">My Rating</span> <span class="sort-arrow"></span></th>
+                        <th class="col-status sortable" data-sort="status"><span data-i18n="th_status">Status</span> <span class="sort-arrow"></span></th>
+                        <th class="col-effort sortable" data-sort="integration_effort"><span data-i18n="th_effort">Effort</span> <span class="sort-arrow"></span></th>
                     </tr>
                 </thead>
                 <tbody id="repo-tbody"></tbody>
             </table>
             <div id="empty-state" class="empty-state hidden">
                 <span class="material-symbols-outlined" style="font-size:48px;color:var(--muted)">search_off</span>
-                <p>No repositories found</p>
+                <p data-i18n="empty_text">No repositories found</p>
             </div>
             <div id="loading-state" class="loading-state hidden">
                 <div class="spinner"></div>
-                <p>Loading data from Google Sheets...</p>
+                <p data-i18n="loading_text">Loading data from Google Sheets...</p>
             </div>
         </main>
     </div>
