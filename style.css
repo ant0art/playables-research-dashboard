@@ -937,6 +937,21 @@ tr.detail-row td { padding: 0; }
 }
 .notes-textarea::placeholder { color: var(--muted); }
 
+/* Save status indicator */
+.notes-save-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.03em;
+    padding: 2px 8px;
+    color: var(--text-secondary);
+    min-height: 16px;
+    transition: color 0.2s;
+}
+.notes-save-saving { color: var(--yellow); }
+.notes-save-saved { color: var(--primary); }
+.notes-save-error { color: var(--red); }
+.notes-save-draft { color: var(--text-secondary); font-style: italic; }
+
 /* Responsive: tablet — equal columns */
 @media (min-width: 641px) and (max-width: 900px) {
     .detail-panel {

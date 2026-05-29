@@ -28,6 +28,11 @@ let state = {
     expandedRow: null,
 };
 
+// --- Drafts & autosave ---
+const _saveTimers = {};  // debounce timers keyed by repoName
+const DRAFT_PREFIX = 'pr_draft_';
+const SAVE_DEBOUNCE_MS = 2000;
+
 // --- DOM refs ---
 const $ = (id) => document.getElementById(id);
 
@@ -256,7 +261,7 @@ function loadGoogleIdentity() {
     script.defer = true;
     script.onload = () => {
         // Check for existing token
-        const stored = sessionStorage.getItem('pr_token');
+        const stored = localStorage.getItem('pr_token');
         if (stored) {
             state.token = stored;
             fetchUserInfo().then(() => {
@@ -288,7 +293,7 @@ function signIn() {
             }
             if (response.access_token) {
                 state.token = response.access_token;
-                sessionStorage.setItem('pr_token', response.access_token);
+                localStorage.setItem('pr_token', response.access_token);
                 fetchUserInfo().then(() => {
                     state.sheetId = localStorage.getItem(CONFIG.STORAGE_KEY);
                     if (state.sheetId) {
@@ -315,8 +320,88 @@ function signOut() {
     }
     state.token = null;
     state.user = null;
-    sessionStorage.removeItem('pr_token');
+    localStorage.removeItem('pr_token');
     showAuth();
+}
+
+// Silent re-auth: try to get a new token without user interaction
+let _silentAuthPromise = null;
+function silentReAuth() {
+    if (_silentAuthPromise) return _silentAuthPromise;
+    _silentAuthPromise = new Promise((resolve, reject) => {
+        try {
+            const client = google.accounts.oauth2.initTokenClient({
+                client_id: CONFIG.CLIENT_ID,
+                scope: CONFIG.SCOPES,
+                prompt: '',
+                callback: (response) => {
+                    _silentAuthPromise = null;
+                    if (response.error || !response.access_token) {
+                        reject(new Error(response.error_description || response.error || 'Silent auth failed'));
+                        return;
+                    }
+                    state.token = response.access_token;
+                    localStorage.setItem('pr_token', response.access_token);
+                    resolve(response.access_token);
+                },
+                error_callback: (err) => {
+                    _silentAuthPromise = null;
+                    reject(err);
+                },
+            });
+            client.requestAccessToken();
+        } catch (e) {
+            _silentAuthPromise = null;
+            reject(e);
+        }
+    });
+    return _silentAuthPromise;
+}
+
+// Handle expired token: save drafts, try silent re-auth, show banner on failure
+async function handleTokenExpired() {
+    // Save all open textarea drafts immediately
+    document.querySelectorAll('.notes-textarea').forEach(ta => {
+        if (ta.value) {
+            localStorage.setItem(DRAFT_PREFIX + ta.dataset.repo, ta.value);
+        }
+    });
+
+    try {
+        await silentReAuth();
+        hideSessionBanner();
+        return true;
+    } catch {
+        showSessionBanner();
+        return false;
+    }
+}
+
+function showSessionBanner() {
+    let banner = document.getElementById('session-banner');
+    if (banner) return;
+    banner = document.createElement('div');
+    banner.id = 'session-banner';
+    banner.innerHTML = `
+        <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">warning</span>
+        <span data-i18n="session_expired">${currentLang === 'ru' ? 'Сессия истекла.' : 'Session expired.'}</span>
+        <button id="btn-reauth" style="margin-left:8px;padding:4px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px">
+            ${currentLang === 'ru' ? 'Войти снова' : 'Sign in again'}
+        </button>
+        <button id="btn-banner-close" style="margin-left:auto;background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:18px">&times;</button>
+    `;
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:10000;display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--surface);border-bottom:2px solid var(--accent);font-size:14px;color:var(--text-primary);box-shadow:0 2px 8px rgba(0,0,0,.15)';
+    document.body.prepend(banner);
+    document.getElementById('btn-reauth').addEventListener('click', () => {
+        hideSessionBanner();
+        signIn();
+    });
+    document.getElementById('btn-banner-close').addEventListener('click', hideSessionBanner);
+}
+
+function hideSessionBanner() {
+    const banner = document.getElementById('session-banner');
+    if (banner) banner.remove();
 }
 
 async function fetchUserInfo() {
@@ -366,7 +451,7 @@ function showDashboard() {
 // Google Sheets API
 // ============================================================
 
-async function sheetsRequest(path, options = {}) {
+async function sheetsRequest(path, options = {}, _retried = false) {
     const url = `${CONFIG.SHEETS_API}/${state.sheetId}${path}`;
     const res = await fetch(url, {
         ...options,
@@ -376,9 +461,10 @@ async function sheetsRequest(path, options = {}) {
             ...options.headers,
         },
     });
-    if (res.status === 401) {
-        signOut();
-        throw new Error('Token expired');
+    if (res.status === 401 && !_retried) {
+        const ok = await handleTokenExpired();
+        if (ok) return sheetsRequest(path, options, true);
+        throw new Error('Token expired — please sign in again');
     }
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -387,7 +473,7 @@ async function sheetsRequest(path, options = {}) {
     return res.json();
 }
 
-async function driveRequest(path, options = {}) {
+async function driveRequest(path, options = {}, _retried = false) {
     const url = `${CONFIG.DRIVE_API}${path}`;
     const res = await fetch(url, {
         ...options,
@@ -397,6 +483,11 @@ async function driveRequest(path, options = {}) {
             ...options.headers,
         },
     });
+    if (res.status === 401 && !_retried) {
+        const ok = await handleTokenExpired();
+        if (ok) return driveRequest(path, options, true);
+        throw new Error('Token expired — please sign in again');
+    }
     if (!res.ok) throw new Error(`Drive API error ${res.status}`);
     return res.json();
 }
@@ -560,6 +651,9 @@ async function saveNote(fullName, field, value) {
     state.notes[fullName][field] = value;
     state.notes[fullName].reviewed_at = new Date().toISOString().split('T')[0];
 
+    // Update save indicator
+    setSaveStatus(fullName, 'saving');
+
     // Rebuild the entire MyNotes sheet (simpler than finding the row)
     const rows = [CONFIG.NOTES_HEADERS];
     Object.values(state.notes).forEach(n => {
@@ -571,9 +665,35 @@ async function saveNote(fullName, field, value) {
             method: 'PUT',
             body: JSON.stringify({ range: 'MyNotes!A1:E1000', values: rows }),
         });
+        // Clear draft on successful save
+        localStorage.removeItem(DRAFT_PREFIX + fullName);
+        setSaveStatus(fullName, 'saved');
     } catch (e) {
         console.error('Failed to save note:', e);
+        setSaveStatus(fullName, 'error');
     }
+}
+
+// Save status indicator for notes textarea
+function setSaveStatus(fullName, status) {
+    document.querySelectorAll(`.notes-save-status[data-repo="${fullName}"]`).forEach(el => {
+        const labels = currentLang === 'ru'
+            ? { saving: 'Сохранение...', saved: '✓ Сохранено', error: '✗ Не сохранено', draft: 'Черновик' }
+            : { saving: 'Saving...', saved: '✓ Saved', error: '✗ Not saved', draft: 'Draft' };
+        el.textContent = labels[status] || '';
+        el.className = `notes-save-status notes-save-${status}`;
+        el.setAttribute('data-repo', fullName);
+    });
+}
+
+// Get draft value from localStorage, or null
+function getDraft(fullName) {
+    return localStorage.getItem(DRAFT_PREFIX + fullName);
+}
+
+// Save draft to localStorage (called on every input)
+function saveDraft(fullName, value) {
+    localStorage.setItem(DRAFT_PREFIX + fullName, value);
 }
 
 // ============================================================
@@ -932,7 +1052,8 @@ function renderDetailRow(repo) {
                             <span>${t('detail_notes')}</span>
                             <span class="material-symbols-outlined" style="font-size:14px">edit_document</span>
                         </div>
-                        <textarea class="notes-textarea" data-repo="${repo.full_name}" placeholder="${t('detail_notes_placeholder')}">${repo.my_notes || ''}</textarea>
+                        <textarea class="notes-textarea" data-repo="${repo.full_name}" placeholder="${t('detail_notes_placeholder')}">${getDraft(repo.full_name) || repo.my_notes || ''}</textarea>
+                        <div class="notes-save-status ${getDraft(repo.full_name) ? 'notes-save-draft' : ''}" data-repo="${repo.full_name}">${getDraft(repo.full_name) ? (currentLang === 'ru' ? 'Черновик' : 'Draft') : ''}</div>
                     </div>
                 </div>
                 <div class="detail-footer">
@@ -1004,7 +1125,8 @@ function renderMobileCardBody(repo) {
         ${renderCodeAnalysisSection(repo)}
         <div class="mobile-card-section">
             <div class="mobile-card-section-title">${t('detail_notes')}</div>
-            <textarea class="notes-textarea" data-repo="${repo.full_name}" placeholder="${t('detail_notes_placeholder')}" style="min-height:60px;border:1px solid var(--border);border-radius:4px;background:var(--surface-low)">${repo.my_notes || ''}</textarea>
+            <textarea class="notes-textarea" data-repo="${repo.full_name}" placeholder="${t('detail_notes_placeholder')}" style="min-height:60px;border:1px solid var(--border);border-radius:4px;background:var(--surface-low)">${getDraft(repo.full_name) || repo.my_notes || ''}</textarea>
+            <div class="notes-save-status ${getDraft(repo.full_name) ? 'notes-save-draft' : ''}" data-repo="${repo.full_name}">${getDraft(repo.full_name) ? (currentLang === 'ru' ? 'Черновик' : 'Draft') : ''}</div>
         </div>
         <div class="mobile-card-actions">
             <select class="detail-status-select" data-repo="${repo.full_name}">
@@ -1136,10 +1258,20 @@ function bindTableEvents() {
         sel.addEventListener('click', (e) => e.stopPropagation());
     });
 
-    // Notes textarea
+    // Notes textarea — draft on input, debounced autosave, blur fallback
     document.querySelectorAll('.notes-textarea').forEach(ta => {
+        const repo = ta.dataset.repo;
+        ta.addEventListener('input', () => {
+            saveDraft(repo, ta.value);
+            setSaveStatus(repo, 'draft');
+            clearTimeout(_saveTimers[repo]);
+            _saveTimers[repo] = setTimeout(() => {
+                saveNote(repo, 'my_notes', ta.value);
+            }, SAVE_DEBOUNCE_MS);
+        });
         ta.addEventListener('blur', () => {
-            saveNote(ta.dataset.repo, 'my_notes', ta.value);
+            clearTimeout(_saveTimers[repo]);
+            saveNote(repo, 'my_notes', ta.value);
         });
         ta.addEventListener('click', (e) => e.stopPropagation());
         ta.addEventListener('keydown', (e) => e.stopPropagation());
@@ -1174,10 +1306,20 @@ function bindMobileCardEvents() {
         });
     });
 
-    // Notes textarea (mobile)
+    // Notes textarea (mobile) — draft on input, debounced autosave, blur fallback
     document.querySelectorAll('.mobile-card .notes-textarea').forEach(ta => {
+        const repo = ta.dataset.repo;
+        ta.addEventListener('input', () => {
+            saveDraft(repo, ta.value);
+            setSaveStatus(repo, 'draft');
+            clearTimeout(_saveTimers[repo]);
+            _saveTimers[repo] = setTimeout(() => {
+                saveNote(repo, 'my_notes', ta.value);
+            }, SAVE_DEBOUNCE_MS);
+        });
         ta.addEventListener('blur', () => {
-            saveNote(ta.dataset.repo, 'my_notes', ta.value);
+            clearTimeout(_saveTimers[repo]);
+            saveNote(repo, 'my_notes', ta.value);
         });
     });
 }
