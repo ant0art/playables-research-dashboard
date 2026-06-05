@@ -11,8 +11,13 @@ const CONFIG = {
     DRIVE_API: 'https://www.googleapis.com/drive/v3/files',
     STORAGE_KEY: 'pr_sheet_id',
     REPOS_HEADERS: ['full_name','url','stars','language','category','relevance_score','summary_ru','application','limitations','integration_effort','worth_tracking','found_date','recommendation','bundle_impact','code_quality_score','architecture_summary'],
-    NOTES_HEADERS: ['full_name','my_rating','status','my_notes','reviewed_at'],
+    NOTES_HEADERS: ['full_name','my_rating','status','my_notes','reviewed_at','flags'],
+    // Deep analysis tab — written by the import control, schema: playables-deep-eval/schema/deep-row.schema.json
+    DEEP_HEADERS: ['full_name','url','target','gate_stack_fit','gate_health','license','ax_dev_speed','ax_quality','ax_dx','ax_bundle','value','effort_days','verdict','one_liner','what_it_gives','integration_notes','evidence','commit_sha','rubric_version','model_version','analyzed_at'],
 };
+
+// Available flags (multi-value per repo, stored CSV in MyNotes.flags)
+const FLAG_VALUES = ['deep', 'reeval', 'brainstorm', 'draft', 'quick-win'];
 
 // --- State ---
 let state = {
@@ -21,6 +26,7 @@ let state = {
     sheetId: null,
     repos: [],
     notes: {},       // keyed by full_name
+    deep: {},        // deep-eval rows keyed by full_name
     sortCol: 'stars',
     sortDir: 'desc',
     filters: JSON.parse(localStorage.getItem('pr_filters') || '{}'),
@@ -128,6 +134,22 @@ const I18N = {
         ca_bundle: 'Bundle Impact',
         ca_quality: 'Code Quality',
         ca_architecture: 'Architecture',
+        // Deep eval
+        de_title: 'Deep Evaluation',
+        de_verdict: 'Verdict',
+        de_value: 'Value',
+        de_effort: 'Effort',
+        de_days: 'd',
+        de_ax_speed: 'Dev speed',
+        de_ax_quality: 'Quality',
+        de_ax_dx: 'DX',
+        de_ax_bundle: 'Bundle',
+        de_what: 'What it gives',
+        de_plan: 'Integration plan',
+        filter_flags: 'Flags',
+        deep_import: 'Deep Analysis Import',
+        deep_import_hint: 'Paste deep-eval JSON (one object or an array)',
+        deep_import_btn: 'Import to Deep tab',
         // Empty / Loading
         empty_text: 'No repositories found',
         loading_text: 'Loading data from Google Sheets...',
@@ -193,6 +215,21 @@ const I18N = {
         ca_bundle: 'Влияние на бандл',
         ca_quality: 'Качество кода',
         ca_architecture: 'Архитектура',
+        de_title: 'Глубокая оценка',
+        de_verdict: 'Вердикт',
+        de_value: 'Ценность',
+        de_effort: 'Усилие',
+        de_days: 'д',
+        de_ax_speed: 'Скорость',
+        de_ax_quality: 'Качество',
+        de_ax_dx: 'DX',
+        de_ax_bundle: 'Бандл',
+        de_what: 'Что даёт',
+        de_plan: 'План интеграции',
+        filter_flags: 'Флаги',
+        deep_import: 'Импорт глубокой оценки',
+        deep_import_hint: 'Вставь JSON оценки (объект или массив)',
+        deep_import_btn: 'Импорт в таб Deep',
         empty_text: 'Репозитории не найдены',
         loading_text: 'Загрузка данных из Google Sheets...',
         mobile_github: 'GitHub',
@@ -587,7 +624,7 @@ async function loadSheetData() {
     showLoading(true);
     try {
         // Batch get both sheets
-        const data = await sheetsRequest('/values:batchGet?ranges=Repos!A1:P1000&ranges=MyNotes!A1:E1000');
+        const data = await sheetsRequest('/values:batchGet?ranges=Repos!A1:P1000&ranges=MyNotes!A1:F1000');
         const ranges = data.valueRanges || [];
 
         // Parse Repos
@@ -621,6 +658,28 @@ async function loadSheetData() {
             });
         }
 
+        // Parse Deep (separate request — tab may not exist yet, must not break main load)
+        state.deep = {};
+        try {
+            const deepData = await sheetsRequest('/values/Deep!A1:U1000');
+            const deepRaw = deepData.values || [];
+            if (deepRaw.length > 1) {
+                const headers = deepRaw[0];
+                deepRaw.slice(1).forEach(row => {
+                    const obj = {};
+                    headers.forEach((h, i) => { obj[h] = row[i] || ''; });
+                    if (!obj.full_name) return;
+                    ['ax_dev_speed','ax_quality','ax_dx','ax_bundle','value','rubric_version'].forEach(k => { obj[k] = parseInt(obj[k], 10) || 0; });
+                    obj.effort_days = parseFloat(obj.effort_days) || 0;
+                    try { obj.evidence = obj.evidence ? JSON.parse(obj.evidence) : []; } catch { obj.evidence = []; }
+                    state.deep[obj.full_name] = obj;
+                });
+            }
+        } catch (e) {
+            // Deep tab absent — fine, panel falls back to legacy Repos fields
+            console.info('Deep tab not loaded (may not exist yet):', e.message);
+        }
+
         populateFilters();
         renderAll();
     } catch (e) {
@@ -646,7 +705,7 @@ function showEmpty(show) {
 
 async function saveNote(fullName, field, value) {
     if (!state.notes[fullName]) {
-        state.notes[fullName] = { full_name: fullName, my_rating: 0, status: '', my_notes: '', reviewed_at: '' };
+        state.notes[fullName] = { full_name: fullName, my_rating: 0, status: '', my_notes: '', reviewed_at: '', flags: '' };
     }
     state.notes[fullName][field] = value;
     state.notes[fullName].reviewed_at = new Date().toISOString().split('T')[0];
@@ -661,9 +720,9 @@ async function saveNote(fullName, field, value) {
     });
 
     try {
-        await sheetsRequest('/values/MyNotes!A1:E1000?valueInputOption=USER_ENTERED', {
+        await sheetsRequest('/values/MyNotes!A1:F1000?valueInputOption=USER_ENTERED', {
             method: 'PUT',
-            body: JSON.stringify({ range: 'MyNotes!A1:E1000', values: rows }),
+            body: JSON.stringify({ range: 'MyNotes!A1:F1000', values: rows }),
         });
         // Clear draft on successful save
         localStorage.removeItem(DRAFT_PREFIX + fullName);
@@ -700,15 +759,22 @@ function saveDraft(fullName, value) {
 // Filtering & Sorting
 // ============================================================
 
+// Parse the CSV flags string into a clean array
+function parseFlags(csv) {
+    return (csv || '').split(',').map(s => s.trim()).filter(Boolean);
+}
+
 function getFilteredRepos() {
     let repos = [...state.repos];
 
-    // Merge notes into repos for display
+    // Merge notes + deep-eval into repos for display
     repos = repos.map(r => ({
         ...r,
         my_rating: state.notes[r.full_name]?.my_rating || 0,
         status: state.notes[r.full_name]?.status || 'new',
         my_notes: state.notes[r.full_name]?.my_notes || '',
+        flags: parseFlags(state.notes[r.full_name]?.flags),
+        deep: state.deep[r.full_name] || null,
     }));
 
     // Apply multiselect filters (arrays)
@@ -723,6 +789,10 @@ function getFilteredRepos() {
     }
     if (state.filters.effort && state.filters.effort.length) {
         repos = repos.filter(r => state.filters.effort.includes(r.integration_effort));
+    }
+    // Flags — multi-value per repo: match if any selected flag is present
+    if (state.filters.flags && state.filters.flags.length) {
+        repos = repos.filter(r => state.filters.flags.some(f => r.flags.includes(f)));
     }
     if (state.searchQuery) {
         const q = state.searchQuery.toLowerCase();
@@ -763,8 +833,13 @@ function populateFilters() {
     // Effort — fixed values
     populateMultiselect('filter-effort', ['low', 'medium', 'high']);
 
+    // Flags — known values plus any seen in data
+    const seenFlags = new Set(FLAG_VALUES);
+    Object.values(state.notes).forEach(n => parseFlags(n.flags).forEach(f => seenFlags.add(f)));
+    populateMultiselect('filter-flags', [...seenFlags]);
+
     // Restore UI state from persisted filters
-    ['filter-category', 'filter-language', 'filter-status', 'filter-effort'].forEach(updateMultiselectUI);
+    ['filter-category', 'filter-language', 'filter-status', 'filter-effort', 'filter-flags'].forEach(updateMultiselectUI);
 }
 
 // ============================================================
@@ -947,8 +1022,82 @@ function formatStars(n) {
     return String(n);
 }
 
+// Rich deep-eval panel (from Deep tab). Returns '' if no deep row for this repo.
+function renderDeepEvalSection(repo) {
+    const d = repo.deep;
+    if (!d) return '';
+
+    const verdictMeta = {
+        DO_NOW:    { text: '✅ Do now',    cls: 'ca-rec-use' },
+        PILOT:     { text: '🧪 Pilot',     cls: 'ca-bundle-medium' },
+        QUICK_WIN: { text: '⚡ Quick win', cls: 'ca-rec-use' },
+        BACKLOG:   { text: '📌 Backlog',   cls: 'ca-bundle-medium' },
+        REJECT:    { text: '🔴 Reject',    cls: 'ca-rec-skip' },
+    };
+    const v = verdictMeta[d.verdict] || { text: d.verdict || '-', cls: '' };
+    const valueCls = d.value >= 60 ? 'ca-quality-high' : d.value >= 40 ? 'ca-quality-mid' : 'ca-quality-low';
+
+    const axis = (label, score) => `<div class="ca-item">
+        <div class="ca-label">${label}</div>
+        <span class="ca-badge">${score || '-'}/5</span>
+    </div>`;
+
+    const evidence = Array.isArray(d.evidence) && d.evidence.length
+        ? `<div class="ca-arch"><div class="ca-label">Evidence</div>${d.evidence.map(e =>
+            `<div class="detail-app" style="font-size:12px"><code>${e.file || ''}</code> — ${e.quote || ''}</div>`).join('')}</div>`
+        : '';
+
+    return `<div class="code-analysis-panel">
+        <div class="ca-header">
+            <span class="material-symbols-outlined" style="font-size:16px;color:var(--accent)">verified</span>
+            <span class="detail-section-title" style="margin:0">${t('de_title')}</span>
+            <span class="badge" style="margin-left:auto">${d.target || ''}</span>
+        </div>
+        <div class="ca-grid">
+            <div class="ca-item">
+                <div class="ca-label">${t('de_verdict')}</div>
+                <span class="ca-badge ${v.cls}">${v.text}</span>
+            </div>
+            <div class="ca-item">
+                <div class="ca-label">${t('de_value')}</div>
+                <div class="ca-quality-bar">
+                    <div class="ca-quality-fill ${valueCls}" style="width:${d.value || 0}%"></div>
+                    <span class="ca-quality-text">${d.value || 0}/100</span>
+                </div>
+            </div>
+            <div class="ca-item">
+                <div class="ca-label">${t('de_effort')}</div>
+                <span class="ca-badge">${d.effort_days || '?'} ${t('de_days')}</span>
+            </div>
+        </div>
+        <div class="ca-grid">
+            ${axis(t('de_ax_speed'), d.ax_dev_speed)}
+            ${axis(t('de_ax_quality'), d.ax_quality)}
+            ${axis(t('de_ax_dx'), d.ax_dx)}
+            ${axis(t('de_ax_bundle'), d.ax_bundle)}
+        </div>
+        ${d.what_it_gives ? `<div class="ca-arch"><div class="ca-label">${t('de_what')}</div><div class="detail-app">${d.what_it_gives}</div></div>` : ''}
+        ${d.integration_notes ? `<div class="ca-arch"><div class="ca-label">${t('de_plan')}</div><div class="detail-app">${d.integration_notes}</div></div>` : ''}
+        ${evidence}
+        <div class="ca-label" style="margin-top:8px;opacity:.6">${d.analyzed_at || ''} · rubric v${d.rubric_version || '?'} · ${d.model_version || ''}</div>
+    </div>`;
+}
+
+// Flag editor — checkboxes that toggle membership in MyNotes.flags (CSV)
+function renderFlagsEditor(repo) {
+    const active = repo.flags || [];
+    return `<div class="flags-editor" data-repo="${repo.full_name}">
+        ${FLAG_VALUES.map(f => `<label class="flag-chip ${active.includes(f) ? 'flag-on' : ''}">
+            <input type="checkbox" value="${f}" ${active.includes(f) ? 'checked' : ''}>${f}
+        </label>`).join('')}
+    </div>`;
+}
+
 function renderCodeAnalysisSection(repo) {
-    // Only show if code analysis data exists
+    // Prefer rich deep-eval data; fall back to legacy Repos fields
+    const deep = renderDeepEvalSection(repo);
+    if (deep) return deep;
+    // Only show legacy if code analysis data exists
     if (!repo.recommendation) return '';
 
     const recLabels = {
@@ -1064,6 +1213,7 @@ function renderDetailRow(repo) {
                             ).join('')}
                         </select>
                         ${starsHTML(repo.my_rating, repo.full_name)}
+                        ${renderFlagsEditor(repo)}
                     </div>
                     <a class="btn-github" href="${repo.url || 'https://github.com/' + repo.full_name}" target="_blank" rel="noopener">
                         <span class="material-symbols-outlined" style="font-size:14px">open_in_new</span>
@@ -1140,6 +1290,7 @@ function renderMobileCardBody(repo) {
                 ${t('mobile_github')}
             </a>
         </div>
+        ${renderFlagsEditor(repo)}
     </div>`;
 }
 
@@ -1225,7 +1376,24 @@ function bindEvents() {
     });
 }
 
+// Flag chip toggles (shared by desktop detail + mobile cards)
+function bindFlagEditors() {
+    document.querySelectorAll('.flags-editor').forEach(editor => {
+        const repo = editor.dataset.repo;
+        editor.addEventListener('click', (e) => e.stopPropagation());
+        editor.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                e.stopPropagation();
+                const checked = Array.from(editor.querySelectorAll('input:checked')).map(c => c.value);
+                saveNote(repo, 'flags', checked.join(','));
+                renderAll();
+            });
+        });
+    });
+}
+
 function bindTableEvents() {
+    bindFlagEditors();
     // Row expand/collapse
     document.querySelectorAll('tr.repo-row').forEach(tr => {
         tr.addEventListener('click', (e) => {
@@ -1279,6 +1447,7 @@ function bindTableEvents() {
 }
 
 function bindMobileCardEvents() {
+    bindFlagEditors();
     // Card expand/collapse
     document.querySelectorAll('.mobile-card-header').forEach(header => {
         header.addEventListener('click', () => {
@@ -1608,10 +1777,84 @@ async function runResearchNow() {
 }
 
 // ============================================================
+// Deep Analysis Import
+// ============================================================
+
+// Create the Deep tab with header row if it doesn't exist yet
+async function ensureDeepSheet() {
+    const meta = await sheetsRequest('?fields=sheets.properties.title');
+    const titles = (meta.sheets || []).map(s => s.properties.title);
+    if (titles.includes('Deep')) return;
+
+    await sheetsRequest(':batchUpdate', {
+        method: 'POST',
+        body: JSON.stringify({ requests: [{ addSheet: { properties: { title: 'Deep' } } }] }),
+    });
+    // Write header row
+    await sheetsRequest('/values/Deep!A1:U1?valueInputOption=USER_ENTERED', {
+        method: 'PUT',
+        body: JSON.stringify({ range: 'Deep!A1:U1', values: [CONFIG.DEEP_HEADERS] }),
+    });
+}
+
+async function importDeepRows() {
+    const btn = $('btn-deep-import');
+    const raw = $('deep-import-json').value.trim();
+    if (!raw) { setStatusMsg('deep-import-status', 'Nothing to import', 'warning'); return; }
+
+    let parsed;
+    try {
+        parsed = JSON.parse(raw);
+    } catch (e) {
+        setStatusMsg('deep-import-status', `❌ Invalid JSON: ${e.message}`, 'error');
+        return;
+    }
+    const incoming = Array.isArray(parsed) ? parsed : [parsed];
+    const valid = incoming.filter(r => r && r.full_name);
+    if (!valid.length) {
+        setStatusMsg('deep-import-status', '❌ No rows with full_name', 'error');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-outlined spinning">progress_activity</span> Importing…';
+
+    try {
+        await ensureDeepSheet();
+
+        // Merge incoming into in-memory deep (same full_name overwrites — idempotent)
+        valid.forEach(r => { state.deep[r.full_name] = r; });
+
+        // Rebuild the whole Deep tab (simpler than locating rows)
+        const rows = [CONFIG.DEEP_HEADERS];
+        Object.values(state.deep).forEach(d => {
+            rows.push(CONFIG.DEEP_HEADERS.map(h =>
+                h === 'evidence' ? JSON.stringify(d.evidence ?? []) : String(d[h] ?? '')
+            ));
+        });
+        await sheetsRequest('/values/Deep!A1:U1000?valueInputOption=USER_ENTERED', {
+            method: 'PUT',
+            body: JSON.stringify({ range: 'Deep!A1:U1000', values: rows }),
+        });
+
+        $('deep-import-json').value = '';
+        setStatusMsg('deep-import-status', `✅ Imported ${valid.length} row(s)`, 'success');
+        renderAll();
+    } catch (e) {
+        console.error('Deep import failed:', e);
+        setStatusMsg('deep-import-status', `❌ ${e.message}`, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-symbols-outlined">upload</span> ' + t('deep_import_btn');
+    }
+}
+
+// ============================================================
 // Settings Event Bindings
 // ============================================================
 
 function bindSettingsEvents() {
+    $('btn-deep-import').addEventListener('click', importDeepRows);
     // Open/close
     $('btn-settings').addEventListener('click', openSettings);
     $('btn-settings-mobile').addEventListener('click', () => {

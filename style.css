@@ -1705,3 +1705,32 @@ tr.detail-row td { padding: 0; }
     }
 }
 
+
+/* ===== Flags editor (multi-value per repo) ===== */
+.flags-editor {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+.flag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    line-height: 1;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.flag-chip input { display: none; }
+.flag-chip.flag-on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+.flag-chip:hover { border-color: var(--accent); }

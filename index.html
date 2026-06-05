@@ -170,6 +170,20 @@
                             <div id="last-run-info" class="settings-last-run"></div>
                         </div>
                     </div>
+
+                    <!-- Deep Analysis Import -->
+                    <div class="settings-section" id="section-deep-import">
+                        <div class="settings-section-label" data-i18n="deep_import">Deep Analysis Import</div>
+                        <div class="settings-card">
+                            <label class="settings-field-label" data-i18n="deep_import_hint">Paste deep-eval JSON (one object or an array)</label>
+                            <textarea id="deep-import-json" class="settings-input" rows="6" placeholder='[{"full_name":"owner/repo", ...}]' style="font-family:monospace;resize:vertical"></textarea>
+                            <button id="btn-deep-import" class="btn-run-now" style="margin-top:8px">
+                                <span class="material-symbols-outlined">upload</span>
+                                <span data-i18n="deep_import_btn">Import to Deep tab</span>
+                            </button>
+                            <div id="deep-import-status" class="settings-status"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -211,6 +225,16 @@
                 <div class="multiselect" id="filter-effort" data-filter="effort">
                     <button class="multiselect-trigger" type="button">
                         <span class="multiselect-label" data-i18n="filter_effort">Effort</span>
+                        <span class="multiselect-count hidden">0</span>
+                        <span class="material-symbols-outlined multiselect-chevron">expand_more</span>
+                    </button>
+                    <div class="multiselect-popup hidden">
+                        <div class="multiselect-options"></div>
+                    </div>
+                </div>
+                <div class="multiselect" id="filter-flags" data-filter="flags">
+                    <button class="multiselect-trigger" type="button">
+                        <span class="multiselect-label" data-i18n="filter_flags">Flags</span>
                         <span class="multiselect-count hidden">0</span>
                         <span class="material-symbols-outlined multiselect-chevron">expand_more</span>
                     </button>
