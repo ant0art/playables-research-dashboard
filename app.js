@@ -148,6 +148,8 @@ const I18N = {
         de_plan: 'Integration plan',
         filter_flags: 'Flags',
         deep_import: 'Deep Analysis Import',
+        deep_import_file_btn: 'Select .json file',
+        deep_import_or: 'or paste JSON below',
         deep_import_hint: 'Paste deep-eval JSON (one object or an array)',
         deep_import_btn: 'Import to Deep tab',
         // Empty / Loading
@@ -228,6 +230,8 @@ const I18N = {
         de_plan: 'План интеграции',
         filter_flags: 'Флаги',
         deep_import: 'Импорт глубокой оценки',
+        deep_import_file_btn: 'Выбрать файл .json',
+        deep_import_or: 'или вставь JSON вручную',
         deep_import_hint: 'Вставь JSON оценки (объект или массив)',
         deep_import_btn: 'Импорт в таб Deep',
         empty_text: 'Репозитории не найдены',
@@ -1797,35 +1801,24 @@ async function ensureDeepSheet() {
     });
 }
 
-async function importDeepRows() {
-    const btn = $('btn-deep-import');
-    const raw = $('deep-import-json').value.trim();
-    if (!raw) { setStatusMsg('deep-import-status', 'Nothing to import', 'warning'); return; }
-
+async function processDeepRows(raw) {
     let parsed;
     try {
         parsed = JSON.parse(raw);
     } catch (e) {
         setStatusMsg('deep-import-status', `❌ Invalid JSON: ${e.message}`, 'error');
-        return;
+        return false;
     }
     const incoming = Array.isArray(parsed) ? parsed : [parsed];
     const valid = incoming.filter(r => r && r.full_name);
     if (!valid.length) {
         setStatusMsg('deep-import-status', '❌ No rows with full_name', 'error');
-        return;
+        return false;
     }
-
-    btn.disabled = true;
-    btn.innerHTML = '<span class="material-symbols-outlined spinning">progress_activity</span> Importing…';
 
     try {
         await ensureDeepSheet();
-
-        // Merge incoming into in-memory deep (same full_name overwrites — idempotent)
         valid.forEach(r => { state.deep[r.full_name] = r; });
-
-        // Rebuild the whole Deep tab (simpler than locating rows)
         const rows = [CONFIG.DEEP_HEADERS];
         Object.values(state.deep).forEach(d => {
             rows.push(CONFIG.DEEP_HEADERS.map(h =>
@@ -1836,17 +1829,52 @@ async function importDeepRows() {
             method: 'PUT',
             body: JSON.stringify({ range: 'Deep!A1:U1000', values: rows }),
         });
-
-        $('deep-import-json').value = '';
         setStatusMsg('deep-import-status', `✅ Imported ${valid.length} row(s)`, 'success');
         renderAll();
+        return true;
     } catch (e) {
         console.error('Deep import failed:', e);
         setStatusMsg('deep-import-status', `❌ ${e.message}`, 'error');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<span class="material-symbols-outlined">upload</span> ' + t('deep_import_btn');
+        return false;
     }
+}
+
+async function importDeepRows() {
+    const btn = $('btn-deep-import');
+    const raw = $('deep-import-json').value.trim();
+    if (!raw) { setStatusMsg('deep-import-status', 'Nothing to import', 'warning'); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-outlined spinning">progress_activity</span> Importing…';
+    const ok = await processDeepRows(raw);
+    if (ok) $('deep-import-json').value = '';
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-outlined">upload</span> ' + t('deep_import_btn');
+}
+
+function importDeepFile() {
+    const fileInput = $('deep-import-file');
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    const btn = $('btn-deep-import-file');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-outlined spinning">progress_activity</span>';
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        await processDeepRows(e.target.result);
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-symbols-outlined">folder_open</span> ' + t('deep_import_file_btn');
+        fileInput.value = '';
+    };
+    reader.onerror = () => {
+        setStatusMsg('deep-import-status', '❌ Failed to read file', 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-symbols-outlined">folder_open</span> ' + t('deep_import_file_btn');
+        fileInput.value = '';
+    };
+    reader.readAsText(file);
 }
 
 // ============================================================
@@ -1855,6 +1883,8 @@ async function importDeepRows() {
 
 function bindSettingsEvents() {
     $('btn-deep-import').addEventListener('click', importDeepRows);
+    $('btn-deep-import-file').addEventListener('click', () => $('deep-import-file').click());
+    $('deep-import-file').addEventListener('change', importDeepFile);
     // Open/close
     $('btn-settings').addEventListener('click', openSettings);
     $('btn-settings-mobile').addEventListener('click', () => {

@@ -175,8 +175,13 @@
                     <div class="settings-section" id="section-deep-import">
                         <div class="settings-section-label" data-i18n="deep_import">Deep Analysis Import</div>
                         <div class="settings-card">
-                            <label class="settings-field-label" data-i18n="deep_import_hint">Paste deep-eval JSON (one object or an array)</label>
-                            <textarea id="deep-import-json" class="settings-input" rows="6" placeholder='[{"full_name":"owner/repo", ...}]' style="font-family:monospace;resize:vertical"></textarea>
+                            <input type="file" id="deep-import-file" accept=".json" style="display:none">
+                            <button id="btn-deep-import-file" class="btn-run-now">
+                                <span class="material-symbols-outlined">folder_open</span>
+                                <span data-i18n="deep_import_file_btn">Select .json file</span>
+                            </button>
+                            <div class="settings-field-label" data-i18n="deep_import_or" style="margin-top:12px;opacity:0.6">or paste JSON below</div>
+                            <textarea id="deep-import-json" class="settings-input" rows="3" placeholder='[{"full_name":"owner/repo", ...}]' style="font-family:monospace;resize:vertical"></textarea>
                             <button id="btn-deep-import" class="btn-run-now" style="margin-top:8px">
                                 <span class="material-symbols-outlined">upload</span>
                                 <span data-i18n="deep_import_btn">Import to Deep tab</span>
