@@ -1379,75 +1379,157 @@ tr.detail-row td { padding: 0; }
 .mobile-card-actions .star-btn .material-symbols-outlined { font-size: 18px; }
 
 /* ============================================================
-   Settings Modal
+   Settings Drawer
    ============================================================ */
 
 /* Overlay */
-.modal-overlay {
+.settings-overlay {
     position: fixed;
     inset: 0;
-    z-index: 200;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
+    z-index: 10100;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: fadeIn 0.2s ease;
-    padding: var(--sp-md);
+    justify-content: flex-end;
 }
 
-@keyframes fadeIn {
+/* Backdrop */
+.settings-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    animation: settingsFadeIn 0.2s ease;
+}
+
+@keyframes settingsFadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
 }
 
-/* Panel */
-.settings-panel {
+/* Drawer panel */
+.settings-drawer {
+    position: relative;
+    width: 420px;
+    height: 100vh;
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    width: 440px;
-    max-width: 100%;
-    max-height: 90vh;
-    overflow-y: auto;
-    animation: slideUp 0.25s ease;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    animation: slideInRight 0.25s ease;
+    z-index: 1;
 }
 
-@keyframes slideUp {
-    from { transform: translateY(16px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+@keyframes slideInRight {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
 }
 
-.settings-header {
+/* Header */
+.settings-drawer-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--sp-md) 20px;
+    height: 48px;
+    padding: 0 16px;
     border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
 }
 
-.settings-title {
+.settings-drawer-title {
     display: flex;
     align-items: center;
     gap: var(--sp-sm);
 }
 
-.settings-title .material-symbols-outlined {
-    color: var(--primary);
-}
-
-.settings-title h2 {
-    font-size: 15px;
+.settings-drawer-title h2 {
+    font-size: 11px;
     font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
     margin: 0;
 }
 
-.settings-body {
-    padding: 20px;
+/* Tab navigation */
+.settings-tabs {
     display: flex;
+    gap: 0;
+    padding: 0;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.settings-tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 12px;
+    background: none;
+    border: none;
+    border-left: 2px solid transparent;
+    color: var(--text-secondary);
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.settings-tab:first-child {
+    border-left: none;
+    border-bottom: 2px solid transparent;
+}
+.settings-tab {
+    border-left: none;
+    border-bottom: 2px solid transparent;
+}
+
+.settings-tab:hover {
+    color: var(--text);
+    background: var(--surface-high);
+}
+
+.settings-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    background: var(--primary-dim);
+}
+
+.settings-tab .material-symbols-outlined {
+    font-size: 16px;
+}
+
+/* Panels container (scrollable) */
+.settings-panels {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.settings-panels::-webkit-scrollbar {
+    width: 4px;
+}
+.settings-panels::-webkit-scrollbar-track {
+    background: transparent;
+}
+.settings-panels::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+}
+
+/* Panel content */
+.settings-panel-content {
+    display: none;
     flex-direction: column;
-    gap: 20px;
+    gap: 24px;
+    padding: 16px;
+}
+
+.settings-panel-content.active {
+    display: flex;
 }
 
 .settings-section-label {
@@ -1685,23 +1767,28 @@ tr.detail-row td { padding: 0; }
     animation: spin-smooth 1s linear infinite;
 }
 
-/* Settings modal mobile */
+/* Settings drawer — tablet */
+@media (max-width: 1024px) {
+    .settings-drawer { width: 360px; }
+}
+
+/* Settings drawer — mobile (bottom sheet) */
 @media (max-width: 640px) {
-    .settings-panel {
+    .settings-overlay {
+        justify-content: flex-end;
+        align-items: flex-end;
+    }
+    .settings-drawer {
         width: 100%;
-        max-height: 85vh;
+        height: 90vh;
+        border-left: none;
+        border-top: 1px solid var(--border);
         border-radius: 12px 12px 0 0;
-        position: fixed;
-        bottom: 0;
         animation: slideUpMobile 0.3s ease;
     }
     @keyframes slideUpMobile {
         from { transform: translateY(100%); }
         to { transform: translateY(0); }
-    }
-    .modal-overlay {
-        align-items: flex-end;
-        padding: 0;
     }
 }
 

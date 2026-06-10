@@ -147,6 +147,9 @@ const I18N = {
         de_what: 'What it gives',
         de_plan: 'Integration plan',
         filter_flags: 'Flags',
+        stab_pipeline: 'Pipeline',
+        stab_github: 'GitHub',
+        stab_deep: 'Deep Eval',
         deep_export: 'Deep Queue Export',
         deep_export_btn: 'Export eval queue (.json)',
         deep_export_clipboard: 'Copy to clipboard',
@@ -233,6 +236,9 @@ const I18N = {
         de_what: 'Что даёт',
         de_plan: 'План интеграции',
         filter_flags: 'Флаги',
+        stab_pipeline: 'Пайплайн',
+        stab_github: 'GitHub',
+        stab_deep: 'Глубокая оценка',
         deep_export: 'Экспорт очереди Deep',
         deep_export_btn: 'Скачать очередь (.json)',
         deep_export_clipboard: 'Скопировать в буфер',
@@ -1641,6 +1647,9 @@ async function openSettings() {
     $('settings-modal').classList.remove('hidden');
     document.body.style.overflow = 'hidden';
 
+    // Reset to first tab on open
+    switchSettingsTab('pipeline');
+
     initSettingsHourOptions();
 
     const pat = getGitHubPAT();
@@ -1658,6 +1667,17 @@ async function openSettings() {
 function closeSettings() {
     $('settings-modal').classList.add('hidden');
     document.body.style.overflow = '';
+}
+
+function switchSettingsTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.settings-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tabName);
+    });
+    // Update panel content
+    document.querySelectorAll('.settings-panel-content').forEach(panel => {
+        panel.classList.toggle('active', panel.dataset.panel === tabName);
+    });
 }
 
 async function loadSettingsData() {
@@ -1966,8 +1986,12 @@ function bindSettingsEvents() {
         openSettings();
     });
     $('btn-close-settings').addEventListener('click', closeSettings);
-    $('settings-modal').addEventListener('click', (e) => {
-        if (e.target === $('settings-modal')) closeSettings();
+    // Backdrop click closes drawer
+    document.querySelector('.settings-backdrop').addEventListener('click', closeSettings);
+
+    // Tab switching
+    document.querySelectorAll('.settings-tab').forEach(btn => {
+        btn.addEventListener('click', () => switchSettingsTab(btn.dataset.tab));
     });
 
     // Escape key

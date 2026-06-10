@@ -106,108 +106,124 @@
             </button>
         </div>
 
-        <!-- Settings Modal -->
-        <div id="settings-modal" class="modal-overlay hidden">
-            <div class="settings-panel">
-                <div class="settings-header">
-                    <div class="settings-title">
-                        <span class="material-symbols-outlined">settings</span>
+        <!-- Settings Drawer -->
+        <div id="settings-modal" class="settings-overlay hidden">
+            <div class="settings-backdrop"></div>
+            <aside class="settings-drawer">
+                <!-- Header -->
+                <div class="settings-drawer-header">
+                    <div class="settings-drawer-title">
+                        <span class="material-symbols-outlined" style="color:var(--primary)">settings</span>
                         <h2 data-i18n="settings_title">Pipeline Settings</h2>
                     </div>
                     <button id="btn-close-settings" class="btn-icon">
                         <span class="material-symbols-outlined">close</span>
                     </button>
                 </div>
-                <div class="settings-body">
-                    <!-- GitHub Connection -->
-                    <div class="settings-section">
-                        <div class="settings-section-label" data-i18n="settings_github">GitHub Connection</div>
-                        <div class="settings-card">
-                            <label class="settings-field-label" data-i18n="settings_pat">Personal Access Token</label>
-                            <div class="settings-pat-row">
-                                <input id="input-github-pat" type="password" class="settings-input" placeholder="ghp_..." autocomplete="off">
-                                <button id="btn-save-pat" class="btn-secondary btn-sm" title="Save token">
+                <!-- Tab navigation -->
+                <nav class="settings-tabs">
+                    <button class="settings-tab active" data-tab="pipeline">
+                        <span class="material-symbols-outlined">play_arrow</span>
+                        <span data-i18n="stab_pipeline">Pipeline</span>
+                    </button>
+                    <button class="settings-tab" data-tab="deep">
+                        <span class="material-symbols-outlined">verified</span>
+                        <span data-i18n="stab_deep">Deep Eval</span>
+                    </button>
+                </nav>
+                <!-- Tab panels -->
+                <div class="settings-panels">
+                    <!-- Pipeline tab -->
+                    <div class="settings-panel-content active" data-panel="pipeline">
+                        <!-- GitHub Connection -->
+                        <div class="settings-section">
+                            <div class="settings-section-label" data-i18n="settings_github">GitHub Connection</div>
+                            <div class="settings-card">
+                                <label class="settings-field-label" data-i18n="settings_pat">Personal Access Token</label>
+                                <div class="settings-pat-row">
+                                    <input id="input-github-pat" type="password" class="settings-input" placeholder="ghp_..." autocomplete="off">
+                                    <button id="btn-save-pat" class="btn-secondary btn-sm" title="Save token">
+                                        <span class="material-symbols-outlined">save</span>
+                                    </button>
+                                </div>
+                                <div id="pat-status" class="settings-status"></div>
+                            </div>
+                        </div>
+                        <!-- Schedule -->
+                        <div class="settings-section" id="section-schedule">
+                            <div class="settings-section-label" data-i18n="settings_schedule">Schedule</div>
+                            <div class="settings-card">
+                                <div class="settings-toggle-row">
+                                    <span id="schedule-status-text" class="schedule-status active" data-i18n="settings_active">Active</span>
+                                    <label class="toggle">
+                                        <input type="checkbox" id="toggle-schedule-enabled" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="settings-time-row">
+                                    <span class="settings-field-label" data-i18n="settings_daily">Daily at</span>
+                                    <select id="select-schedule-hour" class="settings-select"></select>
+                                    <span class="settings-time-utc">:00 UTC</span>
+                                </div>
+                                <div id="local-time-display" class="settings-local-time"></div>
+                                <button id="btn-save-schedule" class="btn-save-schedule hidden">
                                     <span class="material-symbols-outlined">save</span>
+                                    <span data-i18n="settings_save_schedule">Save Schedule</span>
                                 </button>
+                                <div id="schedule-status" class="settings-status"></div>
                             </div>
-                            <div id="pat-status" class="settings-status"></div>
                         </div>
-                    </div>
-
-                    <!-- Schedule -->
-                    <div class="settings-section" id="section-schedule">
-                        <div class="settings-section-label" data-i18n="settings_schedule">Schedule</div>
-                        <div class="settings-card">
-                            <div class="settings-toggle-row">
-                                <span id="schedule-status-text" class="schedule-status active" data-i18n="settings_active">Active</span>
-                                <label class="toggle">
-                                    <input type="checkbox" id="toggle-schedule-enabled" checked>
-                                    <span class="toggle-slider"></span>
-                                </label>
+                        <!-- Manual Run -->
+                        <div class="settings-section" id="section-run">
+                            <div class="settings-section-label" data-i18n="settings_manual">Manual Run</div>
+                            <div class="settings-card">
+                                <button id="btn-run-now" class="btn-run-now">
+                                    <span class="material-symbols-outlined">play_arrow</span>
+                                    <span data-i18n="settings_run">Run Research Now</span>
+                                </button>
+                                <div id="last-run-info" class="settings-last-run"></div>
                             </div>
-                            <div class="settings-time-row">
-                                <span class="settings-field-label" data-i18n="settings_daily">Daily at</span>
-                                <select id="select-schedule-hour" class="settings-select"></select>
-                                <span class="settings-time-utc">:00 UTC</span>
+                        </div>
+                    </div>
+                    <!-- Deep Eval tab -->
+                    <div class="settings-panel-content" data-panel="deep">
+                        <!-- Deep Queue Export -->
+                        <div class="settings-section" id="section-deep-export">
+                            <div class="settings-section-label" data-i18n="deep_export">Deep Queue Export</div>
+                            <div class="settings-card">
+                                <div id="deep-queue-stats" class="settings-field-label" style="margin-bottom:8px"></div>
+                                <button id="btn-deep-export" class="btn-run-now">
+                                    <span class="material-symbols-outlined">download</span>
+                                    <span data-i18n="deep_export_btn">Export eval queue (.json)</span>
+                                </button>
+                                <button id="btn-deep-export-clipboard" class="btn-run-now" style="margin-top:6px">
+                                    <span class="material-symbols-outlined">content_copy</span>
+                                    <span data-i18n="deep_export_clipboard">Copy to clipboard</span>
+                                </button>
+                                <div id="deep-export-status" class="settings-status"></div>
                             </div>
-                            <div id="local-time-display" class="settings-local-time"></div>
-                            <button id="btn-save-schedule" class="btn-save-schedule hidden">
-                                <span class="material-symbols-outlined">save</span>
-                                <span data-i18n="settings_save_schedule">Save Schedule</span>
-                            </button>
-                            <div id="schedule-status" class="settings-status"></div>
                         </div>
-                    </div>
-
-                    <!-- Manual Run -->
-                    <div class="settings-section" id="section-run">
-                        <div class="settings-section-label" data-i18n="settings_manual">Manual Run</div>
-                        <div class="settings-card">
-                            <button id="btn-run-now" class="btn-run-now">
-                                <span class="material-symbols-outlined">play_arrow</span>
-                                <span data-i18n="settings_run">Run Research Now</span>
-                            </button>
-                            <div id="last-run-info" class="settings-last-run"></div>
-                        </div>
-                    </div>
-
-                    <!-- Deep Queue Export -->
-                    <div class="settings-section" id="section-deep-export">
-                        <div class="settings-section-label" data-i18n="deep_export">Deep Queue Export</div>
-                        <div class="settings-card">
-                            <div id="deep-queue-stats" class="settings-field-label" style="margin-bottom:8px"></div>
-                            <button id="btn-deep-export" class="btn-run-now">
-                                <span class="material-symbols-outlined">download</span>
-                                <span data-i18n="deep_export_btn">Export eval queue (.json)</span>
-                            </button>
-                            <button id="btn-deep-export-clipboard" class="btn-run-now" style="margin-top:6px">
-                                <span class="material-symbols-outlined">content_copy</span>
-                                <span data-i18n="deep_export_clipboard">Copy to clipboard</span>
-                            </button>
-                            <div id="deep-export-status" class="settings-status"></div>
-                        </div>
-                    </div>
-
-                    <!-- Deep Analysis Import -->
-                    <div class="settings-section" id="section-deep-import">
-                        <div class="settings-section-label" data-i18n="deep_import">Deep Analysis Import</div>
-                        <div class="settings-card">
-                            <input type="file" id="deep-import-file" accept=".json" style="display:none">
-                            <button id="btn-deep-import-file" class="btn-run-now">
-                                <span class="material-symbols-outlined">folder_open</span>
-                                <span data-i18n="deep_import_file_btn">Select .json file</span>
-                            </button>
-                            <div class="settings-field-label" data-i18n="deep_import_or" style="margin-top:12px;opacity:0.6">or paste JSON below</div>
-                            <textarea id="deep-import-json" class="settings-input" rows="3" placeholder='[{"full_name":"owner/repo", ...}]' style="font-family:monospace;resize:vertical"></textarea>
-                            <button id="btn-deep-import" class="btn-run-now" style="margin-top:8px">
-                                <span class="material-symbols-outlined">upload</span>
-                                <span data-i18n="deep_import_btn">Import to Deep tab</span>
-                            </button>
-                            <div id="deep-import-status" class="settings-status"></div>
+                        <!-- Deep Analysis Import -->
+                        <div class="settings-section" id="section-deep-import">
+                            <div class="settings-section-label" data-i18n="deep_import">Deep Analysis Import</div>
+                            <div class="settings-card">
+                                <input type="file" id="deep-import-file" accept=".json" style="display:none">
+                                <button id="btn-deep-import-file" class="btn-run-now">
+                                    <span class="material-symbols-outlined">folder_open</span>
+                                    <span data-i18n="deep_import_file_btn">Select .json file</span>
+                                </button>
+                                <div class="settings-field-label" data-i18n="deep_import_or" style="margin-top:12px;opacity:0.6">or paste JSON below</div>
+                                <textarea id="deep-import-json" class="settings-input" rows="5" placeholder='[{"full_name":"owner/repo", ...}]' style="font-family:monospace;resize:vertical"></textarea>
+                                <button id="btn-deep-import" class="btn-run-now" style="margin-top:8px">
+                                    <span class="material-symbols-outlined">upload</span>
+                                    <span data-i18n="deep_import_btn">Import to Deep tab</span>
+                                </button>
+                                <div id="deep-import-status" class="settings-status"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </aside>
         </div>
 
         <!-- Filters -->
