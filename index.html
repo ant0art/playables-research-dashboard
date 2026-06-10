@@ -280,6 +280,25 @@
                         <div class="multiselect-options"></div>
                     </div>
                 </div>
+                <!-- Sort Badge & Configurator -->
+                <div class="sort-badge-wrap" id="sort-badge-wrap">
+                    <button id="sort-badge" class="sort-badge-trigger" type="button">
+                        <span class="material-symbols-outlined sort-badge-icon">sort</span>
+                        <span class="sort-badge-label" data-i18n="sort_label">SORT</span>
+                        <span class="sort-badge-count hidden">0</span>
+                    </button>
+                    <div id="sort-configurator-popup" class="sort-configurator-popup hidden">
+                        <div class="sort-config-header">
+                            <span class="sort-config-title" data-i18n="sort_label">SORT</span>
+                            <span class="sort-config-hint" data-i18n="sort_shift_hint">Shift+Click to add sort levels</span>
+                        </div>
+                        <div class="sort-config-list"></div>
+                        <div class="sort-config-footer">
+                            <button id="sort-config-add-btn" class="sort-config-add" type="button" data-i18n="sort_add">+ Add sort level</button>
+                            <button id="sort-config-clear-btn" class="sort-config-clear" type="button" data-i18n="sort_clear">Clear all</button>
+                        </div>
+                    </div>
+                </div>
                 <select id="mobile-sort" class="filter-select mobile-sort-select">
                     <option value="stars:desc" data-i18n="sort_stars">★ Stars ↓</option>
                     <option value="relevance_score:desc" data-i18n="sort_score">Score ↓</option>

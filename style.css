@@ -654,6 +654,268 @@ body {
 /* Mobile sort — hidden on desktop */
 .mobile-sort-select { display: none; }
 
+/* --- Sort Badge & Configurator --- */
+.sort-badge-wrap {
+    position: relative;
+}
+
+.sort-badge-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    cursor: pointer;
+    outline: none;
+    white-space: nowrap;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.sort-badge-trigger:hover {
+    border-color: var(--text-secondary);
+    color: var(--text);
+}
+.sort-badge-trigger.active {
+    border-color: var(--primary);
+    background: var(--primary-dim);
+    color: var(--primary);
+}
+.sort-badge-icon {
+    font-size: 16px !important;
+}
+.sort-badge-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: var(--primary);
+    color: var(--primary-text);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+    line-height: 1;
+}
+
+/* Sort Configurator Popup */
+.sort-configurator-popup {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 100;
+    min-width: 260px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    padding: 0;
+    animation: msPopIn 0.15s ease;
+    overflow: visible;
+}
+
+.sort-config-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px 6px;
+    border-bottom: 1px solid var(--border);
+}
+.sort-config-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+.sort-config-hint {
+    font-size: 10px;
+    color: var(--muted);
+    font-style: italic;
+}
+
+.sort-config-list {
+    padding: 4px;
+}
+
+.sort-config-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    transition: background 0.1s;
+    cursor: grab;
+    user-select: none;
+}
+.sort-config-item:hover {
+    background: var(--surface-high);
+}
+.sort-config-item.dragging {
+    opacity: 0.4;
+}
+.sort-config-item.drag-over {
+    border-top: 2px solid var(--primary);
+}
+
+.sort-config-handle {
+    font-size: 16px !important;
+    color: var(--muted);
+    cursor: grab;
+    flex-shrink: 0;
+}
+.sort-config-handle:active {
+    cursor: grabbing;
+}
+
+.sort-config-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--primary-dim);
+    color: var(--primary);
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.sort-config-col {
+    flex: 1;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.sort-config-dir {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 2px 6px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    transition: border-color 0.15s, color 0.15s;
+}
+.sort-config-dir:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+.sort-config-arrow {
+    font-size: 12px;
+}
+.sort-config-dir-label {
+    font-size: 9px;
+}
+
+.sort-config-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--muted);
+    padding: 2px;
+    border-radius: 3px;
+    transition: color 0.15s, background 0.15s;
+}
+.sort-config-remove:hover {
+    color: var(--red);
+    background: rgba(248, 81, 73, 0.1);
+}
+.sort-config-remove .material-symbols-outlined {
+    font-size: 14px !important;
+}
+
+.sort-config-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px 8px;
+    border-top: 1px solid var(--border);
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.sort-config-add,
+.sort-config-clear {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 3px;
+    transition: background 0.15s, color 0.15s;
+}
+.sort-config-add {
+    color: var(--primary);
+}
+.sort-config-add:hover {
+    background: var(--primary-dim);
+}
+.sort-config-clear {
+    color: var(--text-secondary);
+}
+.sort-config-clear:hover {
+    color: var(--red);
+    background: rgba(248, 81, 73, 0.1);
+}
+
+/* Add column dropdown menu — inline below footer */
+.sort-config-add-menu {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+    animation: msPopIn 0.12s ease;
+}
+.sort-config-add-option {
+    display: inline-flex;
+    align-items: center;
+    background: var(--surface-high);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    transition: background 0.1s, border-color 0.15s;
+}
+.sort-config-add-option:hover {
+    background: var(--primary-dim);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
 /* --- Stats Bar --- */
 #stats-bar {
     display: flex;
@@ -698,6 +960,24 @@ th.sortable:hover { color: var(--text); }
 th.sortable .sort-arrow { font-size: 10px; margin-left: 2px; }
 th.sortable.sort-asc .sort-arrow::after { content: ' \25B2'; }
 th.sortable.sort-desc .sort-arrow::after { content: ' \25BC'; }
+th.sortable.sort-active { color: var(--primary); }
+
+/* Priority number badge on table headers */
+.sort-priority {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--primary-dim);
+    color: var(--primary);
+    font-size: 9px;
+    font-weight: 700;
+    margin-left: 3px;
+    vertical-align: middle;
+    line-height: 1;
+}
 
 .col-expand { width: 32px; }
 .col-name { min-width: 140px; }

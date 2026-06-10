@@ -19,6 +19,17 @@ const CONFIG = {
 // Available flags (multi-value per repo, stored CSV in MyNotes.flags)
 const FLAG_VALUES = ['deep', 'reeval', 'brainstorm', 'draft', 'quick-win'];
 
+// Sortable columns definition: col key -> { i18nKey, defaultDir }
+const SORTABLE_COLS = {
+    full_name:         { i18nKey: 'th_name',     defaultDir: 'asc'  },
+    stars:             { i18nKey: 'th_stars',    defaultDir: 'desc' },
+    category:          { i18nKey: 'th_category', defaultDir: 'asc'  },
+    relevance_score:   { i18nKey: 'th_score',    defaultDir: 'desc' },
+    my_rating:         { i18nKey: 'th_rating',   defaultDir: 'desc' },
+    status:            { i18nKey: 'th_status',   defaultDir: 'asc'  },
+    integration_effort:{ i18nKey: 'th_effort',   defaultDir: 'asc'  },
+};
+
 // --- State ---
 let state = {
     token: null,
@@ -27,8 +38,7 @@ let state = {
     repos: [],
     notes: {},       // keyed by full_name
     deep: {},        // deep-eval rows keyed by full_name
-    sortCol: 'stars',
-    sortDir: 'desc',
+    sortRules: JSON.parse(localStorage.getItem('pr_sort') || '[{"col":"stars","dir":"desc"}]'),
     filters: JSON.parse(localStorage.getItem('pr_filters') || '{}'),
     searchQuery: '',
     expandedRow: null,
@@ -108,6 +118,11 @@ const I18N = {
         sort_rating: 'Rating ↓',
         sort_name: 'Name A-Z',
         sort_status: 'Status',
+        // Sort configurator
+        sort_label: 'SORT',
+        sort_add: '+ Add sort level',
+        sort_clear: 'Clear all',
+        sort_shift_hint: 'Shift+Click to add sort levels',
         // Table headers
         th_name: 'Name',
         th_stars: 'Stars',
@@ -202,6 +217,10 @@ const I18N = {
         sort_rating: 'Рейтинг ↓',
         sort_name: 'Имя A-Z',
         sort_status: 'Статус',
+        sort_label: 'СОРТ.',
+        sort_add: '+ Добавить уровень',
+        sort_clear: 'Сбросить',
+        sort_shift_hint: 'Shift+Click для добавления уровней',
         th_name: 'Название',
         th_stars: 'Звёзды',
         th_category: 'Категория',
@@ -821,17 +840,28 @@ function getFilteredRepos() {
         );
     }
 
-    // Sort
-    const dir = state.sortDir === 'asc' ? 1 : -1;
-    repos.sort((a, b) => {
-        let va = a[state.sortCol];
-        let vb = b[state.sortCol];
-        if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
-        if (state.sortCol === 'stars' || state.sortCol === 'relevance_score' || state.sortCol === 'my_rating') {
-            return ((Number(va) || 0) - (Number(vb) || 0)) * dir;
-        }
-        return String(va || '').localeCompare(String(vb || '')) * dir;
-    });
+    // Multi-level sort
+    const numericCols = new Set(['stars', 'relevance_score', 'my_rating']);
+    const rules = state.sortRules;
+    if (rules.length > 0) {
+        repos.sort((a, b) => {
+            for (const rule of rules) {
+                const dir = rule.dir === 'asc' ? 1 : -1;
+                let va = a[rule.col];
+                let vb = b[rule.col];
+                let cmp = 0;
+                if (typeof va === 'number' && typeof vb === 'number') {
+                    cmp = (va - vb) * dir;
+                } else if (numericCols.has(rule.col)) {
+                    cmp = ((Number(va) || 0) - (Number(vb) || 0)) * dir;
+                } else {
+                    cmp = String(va || '').localeCompare(String(vb || '')) * dir;
+                }
+                if (cmp !== 0) return cmp;
+            }
+            return 0;
+        });
+    }
 
     return repos;
 }
@@ -994,11 +1024,228 @@ function renderStats(repos) {
 
 function renderSortHeaders() {
     document.querySelectorAll('th.sortable').forEach(th => {
-        th.classList.remove('sort-asc', 'sort-desc');
-        if (th.dataset.sort === state.sortCol) {
-            th.classList.add(state.sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+        th.classList.remove('sort-asc', 'sort-desc', 'sort-active');
+        // Remove old priority badge
+        const oldBadge = th.querySelector('.sort-priority');
+        if (oldBadge) oldBadge.remove();
+
+        const col = th.dataset.sort;
+        const ruleIndex = state.sortRules.findIndex(r => r.col === col);
+        if (ruleIndex !== -1) {
+            const rule = state.sortRules[ruleIndex];
+            th.classList.add(rule.dir === 'asc' ? 'sort-asc' : 'sort-desc');
+            th.classList.add('sort-active');
+            // Show priority number only when multi-sorting
+            if (state.sortRules.length > 1) {
+                const badge = document.createElement('span');
+                badge.className = 'sort-priority';
+                badge.textContent = ruleIndex + 1;
+                th.appendChild(badge);
+            }
         }
     });
+    // Update sort badge count
+    renderSortBadge();
+}
+
+function renderSortBadge() {
+    const badge = $('sort-badge');
+    if (!badge) return;
+    const count = state.sortRules.length;
+    const countEl = badge.querySelector('.sort-badge-count');
+    if (count > 1) {
+        countEl.textContent = count;
+        countEl.classList.remove('hidden');
+        badge.classList.add('active');
+    } else {
+        countEl.classList.add('hidden');
+        badge.classList.remove('active');
+    }
+}
+
+// --- Sort Rules CRUD ---
+function saveSortRules() {
+    localStorage.setItem('pr_sort', JSON.stringify(state.sortRules));
+}
+
+function setSortSingle(col) {
+    const def = SORTABLE_COLS[col];
+    const existing = state.sortRules.find(r => r.col === col);
+    if (state.sortRules.length === 1 && existing) {
+        // Toggle direction
+        existing.dir = existing.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+        state.sortRules = [{ col, dir: def ? def.defaultDir : 'desc' }];
+    }
+    saveSortRules();
+    renderAll();
+}
+
+function addSortLevel(col, dir) {
+    if (state.sortRules.find(r => r.col === col)) return; // already present
+    const def = SORTABLE_COLS[col];
+    state.sortRules.push({ col, dir: dir || (def ? def.defaultDir : 'desc') });
+    saveSortRules();
+    renderAll();
+}
+
+function removeSortLevel(index) {
+    state.sortRules.splice(index, 1);
+    if (state.sortRules.length === 0) {
+        state.sortRules = [{ col: 'stars', dir: 'desc' }];
+    }
+    saveSortRules();
+    renderAll();
+}
+
+function toggleSortDirection(index) {
+    const rule = state.sortRules[index];
+    if (rule) {
+        rule.dir = rule.dir === 'asc' ? 'desc' : 'asc';
+        saveSortRules();
+        renderAll();
+    }
+}
+
+function moveSortLevel(fromIndex, toIndex) {
+    if (toIndex < 0 || toIndex >= state.sortRules.length) return;
+    const [moved] = state.sortRules.splice(fromIndex, 1);
+    state.sortRules.splice(toIndex, 0, moved);
+    saveSortRules();
+    renderAll();
+}
+
+function clearSort() {
+    state.sortRules = [{ col: 'stars', dir: 'desc' }];
+    saveSortRules();
+    renderAll();
+}
+
+// --- Sort Configurator Popup ---
+function renderSortConfigurator() {
+    const popup = $('sort-configurator-popup');
+    if (!popup) return;
+    const list = popup.querySelector('.sort-config-list');
+    const addBtn = popup.querySelector('.sort-config-add');
+
+    // Render current rules
+    list.innerHTML = state.sortRules.map((rule, i) => {
+        const label = t(SORTABLE_COLS[rule.col]?.i18nKey || rule.col);
+        const arrow = rule.dir === 'asc' ? '↑' : '↓';
+        const dirLabel = rule.dir;
+        return `<div class="sort-config-item" draggable="true" data-index="${i}">
+            <span class="sort-config-handle material-symbols-outlined">drag_indicator</span>
+            <span class="sort-config-num">${i + 1}</span>
+            <span class="sort-config-col">${label}</span>
+            <button class="sort-config-dir" data-index="${i}" title="Toggle direction">
+                <span class="sort-config-arrow">${arrow}</span>
+                <span class="sort-config-dir-label">${dirLabel}</span>
+            </button>
+            <button class="sort-config-remove" data-index="${i}" title="Remove">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>`;
+    }).join('');
+
+    // Available columns for "Add" button
+    const usedCols = new Set(state.sortRules.map(r => r.col));
+    const availableCols = Object.keys(SORTABLE_COLS).filter(c => !usedCols.has(c));
+    if (availableCols.length === 0) {
+        addBtn.classList.add('hidden');
+    } else {
+        addBtn.classList.remove('hidden');
+    }
+
+    // Bind direction toggles
+    list.querySelectorAll('.sort-config-dir').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleSortDirection(parseInt(btn.dataset.index));
+            renderSortConfigurator();
+        });
+    });
+
+    // Bind remove buttons
+    list.querySelectorAll('.sort-config-remove').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            removeSortLevel(parseInt(btn.dataset.index));
+            renderSortConfigurator();
+        });
+    });
+
+    // Drag & Drop
+    let dragIndex = null;
+    list.querySelectorAll('.sort-config-item').forEach(item => {
+        item.addEventListener('dragstart', (e) => {
+            dragIndex = parseInt(item.dataset.index);
+            item.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        item.addEventListener('dragend', () => {
+            item.classList.remove('dragging');
+            dragIndex = null;
+            list.querySelectorAll('.sort-config-item').forEach(el => el.classList.remove('drag-over'));
+        });
+        item.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            list.querySelectorAll('.sort-config-item').forEach(el => el.classList.remove('drag-over'));
+            item.classList.add('drag-over');
+        });
+        item.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const toIndex = parseInt(item.dataset.index);
+            if (dragIndex !== null && dragIndex !== toIndex) {
+                moveSortLevel(dragIndex, toIndex);
+                renderSortConfigurator();
+            }
+            item.classList.remove('drag-over');
+        });
+    });
+}
+
+function showSortConfigAddMenu(e) {
+    e.stopPropagation();
+    const popup = $('sort-configurator-popup');
+    let menu = popup.querySelector('.sort-config-add-menu');
+    if (menu) { menu.remove(); return; }
+
+    const usedCols = new Set(state.sortRules.map(r => r.col));
+    const availableCols = Object.keys(SORTABLE_COLS).filter(c => !usedCols.has(c));
+    if (availableCols.length === 0) return;
+
+    menu = document.createElement('div');
+    menu.className = 'sort-config-add-menu';
+    menu.innerHTML = availableCols.map(col => {
+        const label = t(SORTABLE_COLS[col].i18nKey);
+        return `<button class="sort-config-add-option" data-col="${col}">${label}</button>`;
+    }).join('');
+
+    menu.querySelectorAll('.sort-config-add-option').forEach(btn => {
+        btn.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            addSortLevel(btn.dataset.col);
+            renderSortConfigurator();
+            menu.remove();
+        });
+    });
+
+    popup.querySelector('.sort-config-footer').appendChild(menu);
+}
+
+function toggleSortConfigurator() {
+    const popup = $('sort-configurator-popup');
+    if (!popup) return;
+    const isOpen = !popup.classList.contains('hidden');
+    // Close all multiselects first
+    closeAllMultiselects();
+    if (isOpen) {
+        popup.classList.add('hidden');
+    } else {
+        popup.classList.remove('hidden');
+        renderSortConfigurator();
+    }
 }
 
 function scoreClass(score) {
@@ -1364,8 +1611,8 @@ function bindEvents() {
     // Mobile sort
     $('mobile-sort').addEventListener('change', (e) => {
         const [col, dir] = e.target.value.split(':');
-        state.sortCol = col;
-        state.sortDir = dir;
+        state.sortRules = [{ col, dir }];
+        saveSortRules();
         renderAll();
     });
 
@@ -1379,18 +1626,50 @@ function bindEvents() {
         }, 200);
     });
 
-    // Sort
+    // Sort — click on table headers
     document.querySelectorAll('th.sortable').forEach(th => {
-        th.addEventListener('click', () => {
+        th.addEventListener('click', (e) => {
             const col = th.dataset.sort;
-            if (state.sortCol === col) {
-                state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+            if (e.shiftKey) {
+                // Shift+Click: add/toggle multi-sort level
+                const existingIndex = state.sortRules.findIndex(r => r.col === col);
+                if (existingIndex !== -1) {
+                    // Toggle direction if already in rules
+                    state.sortRules[existingIndex].dir =
+                        state.sortRules[existingIndex].dir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    // Add new level
+                    const def = SORTABLE_COLS[col];
+                    state.sortRules.push({ col, dir: def ? def.defaultDir : 'desc' });
+                }
             } else {
-                state.sortCol = col;
-                state.sortDir = (col === 'full_name' || col === 'category') ? 'asc' : 'desc';
+                // Normal click: single-column sort
+                setSortSingle(col);
+                return; // setSortSingle calls renderAll + saveSortRules
             }
+            saveSortRules();
             renderAll();
         });
+    });
+
+    // Sort badge & configurator
+    $('sort-badge').addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleSortConfigurator();
+    });
+    $('sort-config-add-btn').addEventListener('click', showSortConfigAddMenu);
+    $('sort-config-clear-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        clearSort();
+        renderSortConfigurator();
+    });
+    // Close sort configurator on outside click
+    $('sort-configurator-popup').addEventListener('click', (e) => e.stopPropagation());
+    document.addEventListener('click', () => {
+        const popup = $('sort-configurator-popup');
+        if (popup && !popup.classList.contains('hidden')) {
+            popup.classList.add('hidden');
+        }
     });
 }
 
