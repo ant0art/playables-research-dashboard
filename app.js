@@ -25,6 +25,7 @@ const SORTABLE_COLS = {
     stars:             { i18nKey: 'th_stars',    defaultDir: 'desc' },
     category:          { i18nKey: 'th_category', defaultDir: 'asc'  },
     relevance_score:   { i18nKey: 'th_score',    defaultDir: 'desc' },
+    verdict:           { i18nKey: 'th_verdict',  defaultDir: 'asc'  },
     my_rating:         { i18nKey: 'th_rating',   defaultDir: 'desc' },
     status:            { i18nKey: 'th_status',   defaultDir: 'asc'  },
     integration_effort:{ i18nKey: 'th_effort',   defaultDir: 'asc'  },
@@ -128,6 +129,7 @@ const I18N = {
         th_stars: 'Stars',
         th_category: 'Category',
         th_score: 'Score',
+        th_verdict: 'Verdict',
         th_rating: 'My Rating',
         th_status: 'Status',
         th_effort: 'Effort',
@@ -162,6 +164,21 @@ const I18N = {
         de_what: 'What it gives',
         de_plan: 'Integration plan',
         filter_flags: 'Flags',
+        filter_verdict: 'Verdict',
+        sort_verdict: 'Verdict',
+        // Verdict display names
+        verdict_do_now: 'Do now',
+        verdict_pilot: 'Pilot — needs proof-of-concept spike before full integration',
+        verdict_quick_win: 'Quick win',
+        verdict_backlog: 'Backlog',
+        verdict_reject: 'Reject',
+        verdict_queued: 'In queue',
+        verdict_none: 'No eval',
+        verdict_override: 'manually set',
+        // Tooltips
+        tip_effort: 'Estimated integration complexity: low (drop-in), medium (some adaptation), high (major rework)',
+        tip_verdict: 'Deep evaluation verdict based on value × effort matrix. DO_NOW = high value, low effort. PILOT = high value, high effort (needs spike). BACKLOG = moderate priority. REJECT = not worth pursuing.',
+        tip_score: 'Automated relevance score (0-100) from the research pipeline. Higher = more relevant to our playable ads stack.',
         stab_pipeline: 'Pipeline',
         stab_github: 'GitHub',
         stab_deep: 'Deep Eval',
@@ -225,6 +242,7 @@ const I18N = {
         th_stars: 'Звёзды',
         th_category: 'Категория',
         th_score: 'Оценка',
+        th_verdict: 'Вердикт',
         th_rating: 'Мой рейтинг',
         th_status: 'Статус',
         th_effort: 'Сложность',
@@ -255,6 +273,21 @@ const I18N = {
         de_what: 'Что даёт',
         de_plan: 'План интеграции',
         filter_flags: 'Флаги',
+        filter_verdict: 'Вердикт',
+        sort_verdict: 'Вердикт',
+        // Verdict display names
+        verdict_do_now: 'Делать сейчас',
+        verdict_pilot: 'Пилот — нужен proof-of-concept перед полной интеграцией',
+        verdict_quick_win: 'Быстрая победа',
+        verdict_backlog: 'Бэклог',
+        verdict_reject: 'Отклонить',
+        verdict_queued: 'В очереди',
+        verdict_none: 'Без оценки',
+        verdict_override: 'задано вручную',
+        // Tooltips
+        tip_effort: 'Оценка сложности интеграции: low (готово из коробки), medium (нужна адаптация), high (серьёзная переработка)',
+        tip_verdict: 'Вердикт глубокой оценки по матрице ценность × усилие. DO_NOW = высокая ценность, малое усилие. PILOT = высокая ценность, большое усилие (нужен спайк). BACKLOG = умеренный приоритет. REJECT = не стоит внедрять.',
+        tip_score: 'Автоматическая оценка релевантности (0-100) от пайплайна. Чем выше — тем больше подходит для нашего стека playable ads.',
         stab_pipeline: 'Пайплайн',
         stab_github: 'GitHub',
         stab_deep: 'Глубокая оценка',
@@ -322,6 +355,8 @@ document.addEventListener('DOMContentLoaded', () => {
     loadGoogleIdentity();
     bindEvents();
     bindSettingsEvents();
+    initTooltips();
+    applyTooltipAttributes();
 });
 
 // ============================================================
@@ -709,6 +744,8 @@ async function loadSheetData() {
                     ['ax_dev_speed','ax_quality','ax_dx','ax_bundle','value','rubric_version'].forEach(k => { obj[k] = parseInt(obj[k], 10) || 0; });
                     obj.effort_days = parseFloat(obj.effort_days) || 0;
                     try { obj.evidence = obj.evidence ? JSON.parse(obj.evidence) : []; } catch { obj.evidence = []; }
+                    // Track original verdict for restore functionality
+                    obj._original_verdict = obj.verdict || '';
                     state.deep[obj.full_name] = obj;
                 });
             }
@@ -801,6 +838,52 @@ function parseFlags(csv) {
     return (csv || '').split(',').map(s => s.trim()).filter(Boolean);
 }
 
+// Verdict ordering for sort (lower = higher priority)
+const VERDICT_ORDER = { DO_NOW: 1, PILOT: 2, QUICK_WIN: 3, BACKLOG: 4, REJECT: 5 };
+const VERDICT_VALUES = ['DO_NOW', 'PILOT', 'QUICK_WIN', 'BACKLOG', 'REJECT'];
+
+function verdictSortValue(v) {
+    if (!v) return 99;
+    return VERDICT_ORDER[v] || 98;
+}
+
+function verdictBadgeClass(v) {
+    if (!v) return 'verdict-none';
+    const map = {
+        DO_NOW: 'verdict-do-now',
+        PILOT: 'verdict-pilot',
+        QUICK_WIN: 'verdict-quick-win',
+        BACKLOG: 'verdict-backlog',
+        REJECT: 'verdict-reject',
+    };
+    return map[v] || 'verdict-none';
+}
+
+function verdictLabel(v) {
+    if (!v) return '—';
+    const map = {
+        DO_NOW: '✅ Do now',
+        PILOT: '🧪 Pilot',
+        QUICK_WIN: '⚡ Quick win',
+        BACKLOG: '📌 Backlog',
+        REJECT: '🔴 Reject',
+    };
+    return map[v] || v;
+}
+
+// Returns verdict badge HTML for table cell
+function verdictBadgeHTML(repo) {
+    const d = repo.deep;
+    if (d && d.verdict) {
+        return `<span class="verdict-badge ${verdictBadgeClass(d.verdict)}">${verdictLabel(d.verdict)}</span>`;
+    }
+    // Deep-flagged but not yet evaluated
+    if (repo.flags && repo.flags.includes('deep')) {
+        return `<span class="verdict-badge verdict-queued">⏳</span>`;
+    }
+    return `<span class="verdict-badge verdict-none">—</span>`;
+}
+
 function getFilteredRepos() {
     let repos = [...state.repos];
 
@@ -812,6 +895,7 @@ function getFilteredRepos() {
         my_notes: state.notes[r.full_name]?.my_notes || '',
         flags: parseFlags(state.notes[r.full_name]?.flags),
         deep: state.deep[r.full_name] || null,
+        verdict: state.deep[r.full_name]?.verdict || '',
     }));
 
     // Apply multiselect filters (arrays)
@@ -830,6 +914,18 @@ function getFilteredRepos() {
     // Flags — multi-value per repo: match if any selected flag is present
     if (state.filters.flags && state.filters.flags.length) {
         repos = repos.filter(r => state.filters.flags.some(f => r.flags.includes(f)));
+    }
+    // Verdict filter
+    if (state.filters.verdict && state.filters.verdict.length) {
+        repos = repos.filter(r => {
+            const v = r.verdict;
+            if (state.filters.verdict.includes(v)) return true;
+            // Special: '⏳' matches deep-flagged but unevaluated
+            if (state.filters.verdict.includes('⏳') && !v && r.flags.includes('deep')) return true;
+            // Special: '—' matches no verdict and no deep flag
+            if (state.filters.verdict.includes('—') && !v && !r.flags.includes('deep')) return true;
+            return false;
+        });
     }
     if (state.searchQuery) {
         const q = state.searchQuery.toLowerCase();
@@ -850,7 +946,9 @@ function getFilteredRepos() {
                 let va = a[rule.col];
                 let vb = b[rule.col];
                 let cmp = 0;
-                if (typeof va === 'number' && typeof vb === 'number') {
+                if (rule.col === 'verdict') {
+                    cmp = (verdictSortValue(va) - verdictSortValue(vb)) * dir;
+                } else if (typeof va === 'number' && typeof vb === 'number') {
                     cmp = (va - vb) * dir;
                 } else if (numericCols.has(rule.col)) {
                     cmp = ((Number(va) || 0) - (Number(vb) || 0)) * dir;
@@ -886,8 +984,11 @@ function populateFilters() {
     Object.values(state.notes).forEach(n => parseFlags(n.flags).forEach(f => seenFlags.add(f)));
     populateMultiselect('filter-flags', [...seenFlags]);
 
+    // Verdict — fixed values plus specials
+    populateMultiselect('filter-verdict', [...VERDICT_VALUES, '⏳', '—']);
+
     // Restore UI state from persisted filters
-    ['filter-category', 'filter-language', 'filter-status', 'filter-effort', 'filter-flags'].forEach(updateMultiselectUI);
+    ['filter-category', 'filter-language', 'filter-status', 'filter-effort', 'filter-flags', 'filter-verdict'].forEach(updateMultiselectUI);
 }
 
 // ============================================================
@@ -1012,6 +1113,7 @@ function renderAll() {
     renderMobileCards(repos);
     renderStats(repos);
     renderSortHeaders();
+    applyTooltipAttributes();
 }
 
 function renderStats(repos) {
@@ -1302,6 +1404,19 @@ function renderDeepEvalSection(repo) {
     const v = verdictMeta[d.verdict] || { text: d.verdict || '-', cls: '' };
     const valueCls = d.value >= 60 ? 'ca-quality-high' : d.value >= 40 ? 'ca-quality-mid' : 'ca-quality-low';
 
+    // Editable verdict select
+    const isOverridden = d._original_verdict && d._original_verdict !== d.verdict;
+    const verdictSelectHTML = `<div class="verdict-select-wrap">
+        <select class="verdict-select" data-repo="${repo.full_name}">
+            ${VERDICT_VALUES.map(vv => `<option value="${vv}" ${d.verdict === vv ? 'selected' : ''}>${verdictLabel(vv)}</option>`).join('')}
+        </select>
+        ${isOverridden ? `<button class="verdict-restore-btn" data-repo="${repo.full_name}" title="Restore: ${verdictLabel(d._original_verdict)}">
+            <span class="material-symbols-outlined">restart_alt</span>
+        </button>
+        <span class="verdict-override-indicator">✏️ ${t('verdict_override')}</span>` : ''}
+    </div>
+    <div class="verdict-save-status" data-verdict-repo="${repo.full_name}"></div>`;
+
     const axis = (label, score) => `<div class="ca-item">
         <div class="ca-label">${label}</div>
         <span class="ca-badge">${score || '-'}/5</span>
@@ -1321,7 +1436,7 @@ function renderDeepEvalSection(repo) {
         <div class="ca-grid">
             <div class="ca-item">
                 <div class="ca-label">${t('de_verdict')}</div>
-                <span class="ca-badge ${v.cls}">${v.text}</span>
+                ${verdictSelectHTML}
             </div>
             <div class="ca-item">
                 <div class="ca-label">${t('de_value')}</div>
@@ -1427,6 +1542,7 @@ function renderTable(repos) {
             <td class="cell-stars">${formatStars(repo.stars)}</td>
             <td><span class="badge">${repo.category || '-'}</span></td>
             <td class="cell-score ${scoreClass(repo.relevance_score)}">${repo.relevance_score}</td>
+            <td class="cell-verdict">${verdictBadgeHTML(repo)}</td>
             <td>${starsHTML(repo.my_rating, repo.full_name)}</td>
             <td>${statusBadge(repo.status)}</td>
             <td class="col-effort"><div class="effort-cell">${effortDot(repo.integration_effort)} ${(repo.integration_effort || '-').toLowerCase()}</div></td>
@@ -1443,7 +1559,7 @@ function renderTable(repos) {
 
 function renderDetailRow(repo) {
     return `<tr class="detail-row" data-detail="${repo.full_name}">
-        <td colspan="8">
+        <td colspan="9">
             <div class="detail-panel">
                 <div class="detail-content">
                     <div class="detail-section-title">${t('detail_review')}</div>
@@ -1512,6 +1628,7 @@ function renderMobileCards(repos) {
                         <span>${formatStars(repo.stars)}</span>
                         <span class="badge">${repo.category || '-'}</span>
                         ${statusBadge(repo.status)}
+                        ${verdictBadgeHTML(repo)}
                     </div>
                 </div>
                 <div class="mobile-card-score ${scoreClass(repo.relevance_score)}">${repo.relevance_score}</div>
@@ -1741,10 +1858,14 @@ function bindTableEvents() {
         ta.addEventListener('click', (e) => e.stopPropagation());
         ta.addEventListener('keydown', (e) => e.stopPropagation());
     });
+
+    // Verdict select change
+    bindVerdictEditors();
 }
 
 function bindMobileCardEvents() {
     bindFlagEditors();
+    bindVerdictEditors();
     // Card expand/collapse
     document.querySelectorAll('.mobile-card-header').forEach(header => {
         header.addEventListener('click', () => {
@@ -1788,6 +1909,254 @@ function bindMobileCardEvents() {
             saveNote(repo, 'my_notes', ta.value);
         });
     });
+}
+
+// ============================================================
+// Verdict Editing
+// ============================================================
+
+function bindVerdictEditors() {
+    // Verdict select dropdowns
+    document.querySelectorAll('.verdict-select').forEach(sel => {
+        sel.addEventListener('change', (e) => {
+            e.stopPropagation();
+            saveVerdictOverride(sel.dataset.repo, e.target.value);
+        });
+        sel.addEventListener('click', (e) => e.stopPropagation());
+    });
+
+    // Verdict restore buttons
+    document.querySelectorAll('.verdict-restore-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const repo = btn.dataset.repo;
+            const d = state.deep[repo];
+            if (d && d._original_verdict) {
+                saveVerdictOverride(repo, d._original_verdict);
+            }
+        });
+    });
+}
+
+function setVerdictSaveStatus(fullName, status) {
+    document.querySelectorAll(`.verdict-save-status[data-verdict-repo="${fullName}"]`).forEach(el => {
+        const labels = currentLang === 'ru'
+            ? { saving: 'Сохранение...', saved: '✓ Сохранено', error: '✗ Ошибка' }
+            : { saving: 'Saving...', saved: '✓ Saved', error: '✗ Error' };
+        el.textContent = labels[status] || '';
+        el.className = `verdict-save-status ${status}`;
+    });
+}
+
+async function saveVerdictOverride(fullName, newVerdict) {
+    // Create stub if no deep row exists yet
+    if (!state.deep[fullName]) {
+        const repo = state.repos.find(r => r.full_name === fullName);
+        state.deep[fullName] = {
+            full_name: fullName,
+            url: repo?.url || `https://github.com/${fullName}`,
+            target: '',
+            gate_stack_fit: 'na',
+            gate_health: 'pass',
+            license: 'unknown',
+            ax_dev_speed: 3,
+            ax_quality: 3,
+            ax_dx: 3,
+            ax_bundle: 3,
+            value: 0,
+            effort_days: 0,
+            verdict: newVerdict,
+            one_liner: '',
+            what_it_gives: '',
+            integration_notes: '',
+            evidence: [],
+            commit_sha: '',
+            rubric_version: 0,
+            model_version: 'manual',
+            analyzed_at: new Date().toISOString(),
+            _original_verdict: newVerdict,
+        };
+    }
+
+    const d = state.deep[fullName];
+    // Store original verdict for restore functionality
+    if (!d._original_verdict) {
+        d._original_verdict = d.verdict;
+    }
+    d.verdict = newVerdict;
+
+    setVerdictSaveStatus(fullName, 'saving');
+
+    // Rebuild Deep sheet
+    const rows = [CONFIG.DEEP_HEADERS];
+    Object.values(state.deep).forEach(dd => {
+        rows.push(CONFIG.DEEP_HEADERS.map(h =>
+            h === 'evidence' ? JSON.stringify(dd.evidence ?? []) : String(dd[h] ?? '')
+        ));
+    });
+
+    try {
+        await ensureDeepSheet();
+        await sheetsRequest('/values/Deep!A1:U1000?valueInputOption=USER_ENTERED', {
+            method: 'PUT',
+            body: JSON.stringify({ range: 'Deep!A1:U1000', values: rows }),
+        });
+        setVerdictSaveStatus(fullName, 'saved');
+        renderAll();
+    } catch (e) {
+        console.error('Verdict save failed:', e);
+        setVerdictSaveStatus(fullName, 'error');
+    }
+}
+
+// ============================================================
+// Tooltip Engine (Follow-cursor, viewport-clamped)
+// ============================================================
+
+const TOOLTIP_TEXTS = {};
+function getTooltipTexts() {
+    return {
+        tip_effort: t('tip_effort'),
+        tip_verdict: t('tip_verdict'),
+        tip_score: t('tip_score'),
+    };
+}
+
+let _tooltipEl = null;
+let _tooltipVisible = false;
+let _tooltipDelay = null;
+
+function ensureTooltipEl() {
+    if (_tooltipEl) return _tooltipEl;
+    _tooltipEl = document.createElement('div');
+    _tooltipEl.className = 'app-tooltip';
+    document.body.appendChild(_tooltipEl);
+    return _tooltipEl;
+}
+
+function showTooltip(html, e) {
+    const el = ensureTooltipEl();
+    el.innerHTML = html;
+    _tooltipVisible = true;
+    positionTooltip(e);
+    requestAnimationFrame(() => el.classList.add('visible'));
+}
+
+function hideTooltip() {
+    clearTimeout(_tooltipDelay);
+    _tooltipVisible = false;
+    if (_tooltipEl) _tooltipEl.classList.remove('visible');
+}
+
+function positionTooltip(e) {
+    if (!_tooltipEl || !_tooltipVisible) return;
+    const pad = 14;
+    const rect = _tooltipEl.getBoundingClientRect();
+    let x = e.clientX + pad;
+    let y = e.clientY + pad;
+
+    // Clamp right
+    if (x + rect.width > window.innerWidth - 8) {
+        x = e.clientX - rect.width - pad;
+    }
+    // Clamp bottom
+    if (y + rect.height > window.innerHeight - 8) {
+        y = e.clientY - rect.height - pad;
+    }
+    // Clamp left/top
+    if (x < 8) x = 8;
+    if (y < 8) y = 8;
+
+    _tooltipEl.style.left = x + 'px';
+    _tooltipEl.style.top = y + 'px';
+}
+
+function initTooltips() {
+    // Desktop: hover on table headers with data-tooltip
+    document.addEventListener('mouseover', (e) => {
+        const target = e.target.closest('[data-tooltip]');
+        if (!target) return;
+        clearTimeout(_tooltipDelay);
+        const key = target.dataset.tooltip;
+        const text = getTooltipTexts()[key] || key;
+        const title = target.dataset.tooltipTitle || '';
+        const html = (title ? `<div class="app-tooltip-title">${title}</div>` : '') + text;
+        _tooltipDelay = setTimeout(() => showTooltip(html, e), 300);
+    });
+
+    document.addEventListener('mouseout', (e) => {
+        if (e.target.closest('[data-tooltip]')) {
+            hideTooltip();
+        }
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (_tooltipVisible) positionTooltip(e);
+    });
+
+    // Mobile: tap on ? buttons
+    document.addEventListener('click', (e) => {
+        const trigger = e.target.closest('.tooltip-trigger-mobile');
+        if (!trigger) return;
+        e.stopPropagation();
+        e.preventDefault();
+
+        // Remove existing mobile tooltip
+        closeMobileTooltip();
+
+        const key = trigger.dataset.tooltip;
+        const text = getTooltipTexts()[key] || key;
+        const title = trigger.dataset.tooltipTitle || '';
+
+        const backdrop = document.createElement('div');
+        backdrop.className = 'mobile-tooltip-backdrop';
+        backdrop.addEventListener('click', closeMobileTooltip);
+
+        const popup = document.createElement('div');
+        popup.className = 'mobile-tooltip-popup';
+        popup.id = 'mobile-tooltip-active';
+        popup.innerHTML = `
+            ${title ? `<div class="app-tooltip-title">${title}</div>` : ''}
+            ${text}
+            <button class="mobile-tooltip-close" onclick="closeMobileTooltip()">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        `;
+
+        // Position near the trigger
+        const rect = trigger.getBoundingClientRect();
+        popup.style.top = Math.min(rect.bottom + 8, window.innerHeight - 200) + 'px';
+        popup.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 288)) + 'px';
+
+        document.body.appendChild(backdrop);
+        document.body.appendChild(popup);
+    });
+}
+
+function closeMobileTooltip() {
+    document.querySelectorAll('.mobile-tooltip-popup, .mobile-tooltip-backdrop').forEach(el => el.remove());
+}
+
+// Add tooltip data attributes to table headers after they exist
+function applyTooltipAttributes() {
+    // Score column header
+    const scoreTh = document.querySelector('th[data-sort="relevance_score"]');
+    if (scoreTh && !scoreTh.dataset.tooltip) {
+        scoreTh.dataset.tooltip = 'tip_score';
+        scoreTh.dataset.tooltipTitle = t('th_score');
+    }
+    // Verdict column header
+    const verdictTh = document.querySelector('th[data-sort="verdict"]');
+    if (verdictTh && !verdictTh.dataset.tooltip) {
+        verdictTh.dataset.tooltip = 'tip_verdict';
+        verdictTh.dataset.tooltipTitle = t('th_verdict');
+    }
+    // Effort column header
+    const effortTh = document.querySelector('th[data-sort="integration_effort"]');
+    if (effortTh && !effortTh.dataset.tooltip) {
+        effortTh.dataset.tooltip = 'tip_effort';
+        effortTh.dataset.tooltipTitle = t('th_effort');
+    }
 }
 
 // ============================================================

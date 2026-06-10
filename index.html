@@ -280,6 +280,16 @@
                         <div class="multiselect-options"></div>
                     </div>
                 </div>
+                <div class="multiselect" id="filter-verdict" data-filter="verdict">
+                    <button class="multiselect-trigger" type="button">
+                        <span class="multiselect-label" data-i18n="filter_verdict">Verdict</span>
+                        <span class="multiselect-count hidden">0</span>
+                        <span class="material-symbols-outlined multiselect-chevron">expand_more</span>
+                    </button>
+                    <div class="multiselect-popup hidden">
+                        <div class="multiselect-options"></div>
+                    </div>
+                </div>
                 <!-- Sort Badge & Configurator -->
                 <div class="sort-badge-wrap" id="sort-badge-wrap">
                     <button id="sort-badge" class="sort-badge-trigger" type="button">
@@ -302,6 +312,7 @@
                 <select id="mobile-sort" class="filter-select mobile-sort-select">
                     <option value="stars:desc" data-i18n="sort_stars">★ Stars ↓</option>
                     <option value="relevance_score:desc" data-i18n="sort_score">Score ↓</option>
+                    <option value="verdict:asc" data-i18n="sort_verdict">Verdict</option>
                     <option value="my_rating:desc" data-i18n="sort_rating">Rating ↓</option>
                     <option value="full_name:asc" data-i18n="sort_name">Name A-Z</option>
                     <option value="status:asc" data-i18n="sort_status">Status</option>
@@ -332,6 +343,7 @@
                         <th class="col-stars sortable" data-sort="stars"><span data-i18n="th_stars">Stars</span> <span class="sort-arrow"></span></th>
                         <th class="col-cat sortable" data-sort="category"><span data-i18n="th_category">Category</span> <span class="sort-arrow"></span></th>
                         <th class="col-score sortable" data-sort="relevance_score"><span data-i18n="th_score">Score</span> <span class="sort-arrow"></span></th>
+                        <th class="col-verdict sortable" data-sort="verdict"><span data-i18n="th_verdict">Verdict</span> <span class="sort-arrow"></span></th>
                         <th class="col-rating sortable" data-sort="my_rating"><span data-i18n="th_rating">My Rating</span> <span class="sort-arrow"></span></th>
                         <th class="col-status sortable" data-sort="status"><span data-i18n="th_status">Status</span> <span class="sort-arrow"></span></th>
                         <th class="col-effort sortable" data-sort="integration_effort"><span data-i18n="th_effort">Effort</span> <span class="sort-arrow"></span></th>
