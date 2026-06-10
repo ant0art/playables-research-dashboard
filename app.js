@@ -147,6 +147,10 @@ const I18N = {
         de_what: 'What it gives',
         de_plan: 'Integration plan',
         filter_flags: 'Flags',
+        deep_export: 'Deep Queue Export',
+        deep_export_btn: 'Export eval queue (.json)',
+        deep_export_clipboard: 'Copy to clipboard',
+        deep_export_stats: (total, done, queue) => `${total} deep-flagged · ${done} evaluated · ${queue} in queue`,
         deep_import: 'Deep Analysis Import',
         deep_import_file_btn: 'Select .json file',
         deep_import_or: 'or paste JSON below',
@@ -229,6 +233,10 @@ const I18N = {
         de_what: 'Что даёт',
         de_plan: 'План интеграции',
         filter_flags: 'Флаги',
+        deep_export: 'Экспорт очереди Deep',
+        deep_export_btn: 'Скачать очередь (.json)',
+        deep_export_clipboard: 'Скопировать в буфер',
+        deep_export_stats: (total, done, queue) => `${total} с флагом deep · ${done} оценено · ${queue} в очереди`,
         deep_import: 'Импорт глубокой оценки',
         deep_import_file_btn: 'Выбрать файл .json',
         deep_import_or: 'или вставь JSON вручную',
@@ -1643,6 +1651,8 @@ async function openSettings() {
     } else {
         setStatusMsg('pat-status', '⚠️ Enter a GitHub PAT with repo scope', 'warning');
     }
+
+    updateDeepQueueStats();
 }
 
 function closeSettings() {
@@ -1781,6 +1791,68 @@ async function runResearchNow() {
 }
 
 // ============================================================
+// Deep Queue Export
+// ============================================================
+
+function getDeepQueue() {
+    const deepFlagged = Object.entries(state.notes)
+        .filter(([, v]) => parseFlags(v.flags).includes('deep'))
+        .map(([k]) => k);
+    const deepEvaluated = new Set(Object.keys(state.deep));
+    const repoMap = {};
+    state.repos.forEach(r => { repoMap[r.full_name] = r.url; });
+
+    const queue = deepFlagged
+        .filter(name => !deepEvaluated.has(name))
+        .map(name => ({ full_name: name, url: repoMap[name] || `https://github.com/${name}` }));
+
+    return { total: deepFlagged.length, done: deepEvaluated.size, queue };
+}
+
+function updateDeepQueueStats() {
+    const el = $('deep-queue-stats');
+    if (!el) return;
+    const { total, done, queue } = getDeepQueue();
+    const statsFn = (I18N[currentLang] || I18N.en).deep_export_stats;
+    el.textContent = typeof statsFn === 'function'
+        ? statsFn(total, done, queue.length)
+        : `${total} deep-flagged · ${done} evaluated · ${queue.length} in queue`;
+}
+
+function exportDeepQueue() {
+    const { queue } = getDeepQueue();
+    if (!queue.length) {
+        setStatusMsg('deep-export-status', currentLang === 'ru' ? '⚠ Очередь пуста' : '⚠ Queue is empty', 'warning');
+        return;
+    }
+    const blob = new Blob([JSON.stringify(queue, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `deep-eval-queue-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    setStatusMsg('deep-export-status', `✅ ${queue.length} repos exported`, 'success');
+}
+
+async function exportDeepQueueClipboard() {
+    const { queue } = getDeepQueue();
+    if (!queue.length) {
+        setStatusMsg('deep-export-status', currentLang === 'ru' ? '⚠ Очередь пуста' : '⚠ Queue is empty', 'warning');
+        return;
+    }
+    try {
+        await navigator.clipboard.writeText(JSON.stringify(queue, null, 2));
+        setStatusMsg('deep-export-status',
+            `✅ ${queue.length} repos → clipboard`,
+            'success');
+    } catch (e) {
+        setStatusMsg('deep-export-status', `❌ ${e.message}`, 'error');
+    }
+}
+
+// ============================================================
 // Deep Analysis Import
 // ============================================================
 
@@ -1882,6 +1954,8 @@ function importDeepFile() {
 // ============================================================
 
 function bindSettingsEvents() {
+    $('btn-deep-export').addEventListener('click', exportDeepQueue);
+    $('btn-deep-export-clipboard').addEventListener('click', exportDeepQueueClipboard);
     $('btn-deep-import').addEventListener('click', importDeepRows);
     $('btn-deep-import-file').addEventListener('click', () => $('deep-import-file').click());
     $('deep-import-file').addEventListener('change', importDeepFile);
