@@ -191,6 +191,17 @@ const I18N = {
         deep_import_or: 'or paste JSON below',
         deep_import_hint: 'Paste deep-eval JSON (one object or an array)',
         deep_import_btn: 'Import to Deep tab',
+        // Flag Export
+        stab_export: 'Export',
+        flag_export_title: 'Export by Flag',
+        flag_export_select: 'Select flag',
+        flag_export_btn: 'Download .json',
+        flag_export_clipboard: 'Copy to clipboard',
+        flag_export_md: 'Download .md',
+        flag_export_stats: (count, flag) => `${count} repos with flag "${flag}"`,
+        flag_export_empty: 'No repos with this flag',
+        flag_export_all: 'Export current view',
+        flag_export_all_desc: 'Export all currently filtered repos',
         // Empty / Loading
         empty_text: 'No repositories found',
         loading_text: 'Loading data from Google Sheets...',
@@ -300,6 +311,17 @@ const I18N = {
         deep_import_or: 'или вставь JSON вручную',
         deep_import_hint: 'Вставь JSON оценки (объект или массив)',
         deep_import_btn: 'Импорт в таб Deep',
+        // Flag Export
+        stab_export: 'Экспорт',
+        flag_export_title: 'Экспорт по флагу',
+        flag_export_select: 'Выберите флаг',
+        flag_export_btn: 'Скачать .json',
+        flag_export_clipboard: 'Скопировать в буфер',
+        flag_export_md: 'Скачать .md',
+        flag_export_stats: (count, flag) => `${count} репо с флагом "${flag}"`,
+        flag_export_empty: 'Нет репо с этим флагом',
+        flag_export_all: 'Экспорт текущего вида',
+        flag_export_all_desc: 'Экспорт всех отфильтрованных репо',
         empty_text: 'Репозитории не найдены',
         loading_text: 'Загрузка данных из Google Sheets...',
         mobile_github: 'GitHub',
@@ -2310,6 +2332,7 @@ async function openSettings() {
     }
 
     updateDeepQueueStats();
+    populateFlagExportSelect();
 }
 
 function closeSettings() {
@@ -2521,6 +2544,226 @@ async function exportDeepQueueClipboard() {
 }
 
 // ============================================================
+// Flag-based Data Export
+// ============================================================
+
+function getReposByFlag(flag) {
+    if (!flag) return [];
+
+    // Special: 'current_view' exports whatever is currently filtered
+    if (flag === '__current_view__') {
+        return getFilteredRepos().map(r => buildExportRow(r.full_name));
+    }
+
+    return state.repos
+        .filter(r => {
+            const flags = parseFlags(state.notes[r.full_name]?.flags);
+            return flags.includes(flag);
+        })
+        .map(r => buildExportRow(r.full_name));
+}
+
+function buildExportRow(fullName) {
+    const r = state.repos.find(repo => repo.full_name === fullName) || {};
+    const n = state.notes[fullName] || {};
+    const d = state.deep[fullName] || {};
+
+    return {
+        // Repos tab
+        full_name: r.full_name || fullName,
+        url: r.url || `https://github.com/${fullName}`,
+        stars: r.stars || 0,
+        language: r.language || '',
+        category: r.category || '',
+        relevance_score: r.relevance_score || 0,
+        summary_ru: r.summary_ru || '',
+        application: r.application || '',
+        limitations: r.limitations || '',
+        integration_effort: r.integration_effort || '',
+        worth_tracking: r.worth_tracking || '',
+        found_date: r.found_date || '',
+        recommendation: r.recommendation || '',
+        bundle_impact: r.bundle_impact || '',
+        code_quality_score: r.code_quality_score || 0,
+        architecture_summary: r.architecture_summary || '',
+        // MyNotes tab
+        my_rating: n.my_rating || 0,
+        status: n.status || 'new',
+        my_notes: n.my_notes || '',
+        flags: n.flags || '',
+        reviewed_at: n.reviewed_at || '',
+        // Deep Eval tab
+        target: d.target || '',
+        gate_stack_fit: d.gate_stack_fit || '',
+        gate_health: d.gate_health || '',
+        license: d.license || '',
+        ax_dev_speed: d.ax_dev_speed || 0,
+        ax_quality: d.ax_quality || 0,
+        ax_dx: d.ax_dx || 0,
+        ax_bundle: d.ax_bundle || 0,
+        value: d.value || 0,
+        effort_days: d.effort_days || 0,
+        verdict: d.verdict || '',
+        one_liner: d.one_liner || '',
+        what_it_gives: d.what_it_gives || '',
+        integration_notes: d.integration_notes || '',
+    };
+}
+
+function updateFlagExportStats() {
+    const select = $('flag-export-select');
+    const statsEl = $('flag-export-stats');
+    if (!select || !statsEl) return;
+
+    const flag = select.value;
+    if (!flag) {
+        statsEl.textContent = '';
+        return;
+    }
+
+    const repos = getReposByFlag(flag);
+    const statsFn = (I18N[currentLang] || I18N.en).flag_export_stats;
+    const emptyMsg = t('flag_export_empty');
+
+    if (repos.length === 0) {
+        statsEl.textContent = emptyMsg;
+        statsEl.style.color = 'var(--warning)';
+    } else {
+        const label = flag === '__current_view__' ? 'current view' : flag;
+        statsEl.textContent = typeof statsFn === 'function'
+            ? statsFn(repos.length, label)
+            : `${repos.length} repos`;
+        statsEl.style.color = 'var(--text-secondary)';
+    }
+}
+
+function populateFlagExportSelect() {
+    const select = $('flag-export-select');
+    if (!select) return;
+
+    // Gather all known flags from data
+    const seenFlags = new Set(FLAG_VALUES);
+    Object.values(state.notes).forEach(n => parseFlags(n.flags).forEach(f => seenFlags.add(f)));
+
+    select.innerHTML = `<option value="" disabled selected>${t('flag_export_select')}</option>`;
+
+    // Add current view option
+    select.innerHTML += `<option value="__current_view__">${t('flag_export_all')}</option>`;
+
+    // Add flag options with counts
+    [...seenFlags].sort().forEach(flag => {
+        const count = state.repos.filter(r =>
+            parseFlags(state.notes[r.full_name]?.flags).includes(flag)
+        ).length;
+        select.innerHTML += `<option value="${flag}">${flag} (${count})</option>`;
+    });
+}
+
+function exportByFlag() {
+    const flag = $('flag-export-select')?.value;
+    if (!flag) return;
+
+    const repos = getReposByFlag(flag);
+    if (!repos.length) {
+        setStatusMsg('flag-export-status', t('flag_export_empty'), 'warning');
+        return;
+    }
+
+    const blob = new Blob([JSON.stringify(repos, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    const label = flag === '__current_view__' ? 'current-view' : flag;
+    a.href = URL.createObjectURL(blob);
+    a.download = `repos-${label}-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    setStatusMsg('flag-export-status', `✅ ${repos.length} repos exported`, 'success');
+}
+
+async function exportByFlagClipboard() {
+    const flag = $('flag-export-select')?.value;
+    if (!flag) return;
+
+    const repos = getReposByFlag(flag);
+    if (!repos.length) {
+        setStatusMsg('flag-export-status', t('flag_export_empty'), 'warning');
+        return;
+    }
+
+    try {
+        await navigator.clipboard.writeText(JSON.stringify(repos, null, 2));
+        setStatusMsg('flag-export-status', `✅ ${repos.length} repos → clipboard`, 'success');
+    } catch (e) {
+        setStatusMsg('flag-export-status', `❌ ${e.message}`, 'error');
+    }
+}
+
+function exportByFlagMarkdown() {
+    const flag = $('flag-export-select')?.value;
+    if (!flag) return;
+
+    const repos = getReposByFlag(flag);
+    if (!repos.length) {
+        setStatusMsg('flag-export-status', t('flag_export_empty'), 'warning');
+        return;
+    }
+
+    let md = `# Export: ${flag === '__current_view__' ? 'Current View' : `Flag "${flag}"`}\n`;
+    md += `> ${repos.length} repositories · ${new Date().toISOString().slice(0, 10)}\n\n`;
+
+    // Group by category
+    const grouped = {};
+    repos.forEach(r => {
+        const cat = r.category || 'Uncategorized';
+        if (!grouped[cat]) grouped[cat] = [];
+        grouped[cat].push(r);
+    });
+
+    for (const [cat, items] of Object.entries(grouped).sort()) {
+        md += `## ${cat} (${items.length})\n\n`;
+        for (const r of items) {
+            const stars = r.stars ? `⭐ ${r.stars.toLocaleString()}` : '';
+            const verdict = r.verdict ? ` · ${verdictLabel(r.verdict)}` : '';
+            const effort = r.integration_effort ? ` · Effort: ${r.integration_effort}` : '';
+            const value = r.value ? ` · Value: ${r.value}` : '';
+
+            md += `### ${stars} — [${r.full_name}](${r.url})${verdict}${effort}${value}\n`;
+            md += `**Язык:** ${r.language || '—'} | **Target:** ${r.target || '—'}\n\n`;
+
+            if (r.one_liner) md += `> ${r.one_liner}\n\n`;
+
+            if (r.summary_ru) md += `**Обзор:** ${r.summary_ru}\n\n`;
+            if (r.application) md += `**Применение:** ${r.application}\n\n`;
+            if (r.limitations) md += `**Ограничения:** ${r.limitations}\n\n`;
+            if (r.what_it_gives) md += `**Что даёт:** ${r.what_it_gives}\n\n`;
+            if (r.integration_notes) md += `**План интеграции:** ${r.integration_notes}\n\n`;
+            if (r.my_notes) md += `**Мои заметки:** ${r.my_notes}\n\n`;
+
+            // Deep eval axes
+            if (r.value) {
+                md += `| Dev Speed | Quality | DX | Bundle | Value | Effort |\n`;
+                md += `|---|---|---|---|---|---|\n`;
+                md += `| ${r.ax_dev_speed}/5 | ${r.ax_quality}/5 | ${r.ax_dx}/5 | ${r.ax_bundle}/5 | ${r.value} | ${r.effort_days}d |\n\n`;
+            }
+
+            md += `---\n\n`;
+        }
+    }
+
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const a = document.createElement('a');
+    const label = flag === '__current_view__' ? 'current-view' : flag;
+    a.href = URL.createObjectURL(blob);
+    a.download = `repos-${label}-${new Date().toISOString().slice(0, 10)}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    setStatusMsg('flag-export-status', `✅ ${repos.length} repos → Markdown`, 'success');
+}
+
+// ============================================================
 // Deep Analysis Import
 // ============================================================
 
@@ -2627,6 +2870,11 @@ function bindSettingsEvents() {
     $('btn-deep-import').addEventListener('click', importDeepRows);
     $('btn-deep-import-file').addEventListener('click', () => $('deep-import-file').click());
     $('deep-import-file').addEventListener('change', importDeepFile);
+    // Flag export
+    $('btn-flag-export').addEventListener('click', exportByFlag);
+    $('btn-flag-export-clipboard').addEventListener('click', exportByFlagClipboard);
+    $('btn-flag-export-md').addEventListener('click', exportByFlagMarkdown);
+    $('flag-export-select').addEventListener('change', updateFlagExportStats);
     // Open/close
     $('btn-settings').addEventListener('click', openSettings);
     $('btn-settings-mobile').addEventListener('click', () => {
