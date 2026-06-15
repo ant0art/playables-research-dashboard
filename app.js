@@ -11,7 +11,7 @@ const CONFIG = {
     DRIVE_API: 'https://www.googleapis.com/drive/v3/files',
     STORAGE_KEY: 'pr_sheet_id',
     REPOS_HEADERS: ['full_name','url','stars','language','category','relevance_score','summary_ru','application','limitations','integration_effort','worth_tracking','found_date','recommendation','bundle_impact','code_quality_score','architecture_summary'],
-    NOTES_HEADERS: ['full_name','my_rating','status','my_notes','reviewed_at','flags'],
+    NOTES_HEADERS: ['full_name','my_rating','status','my_notes','reviewed_at','flags','brainstorm_session'],
     // Deep analysis tab — written by the import control, schema: playables-deep-eval/schema/deep-row.schema.json
     DEEP_HEADERS: ['full_name','url','target','gate_stack_fit','gate_health','license','ax_dev_speed','ax_quality','ax_dx','ax_bundle','value','effort_days','verdict','one_liner','what_it_gives','integration_notes','evidence','commit_sha','rubric_version','model_version','analyzed_at'],
 };
@@ -165,6 +165,10 @@ const I18N = {
         de_plan: 'Integration plan',
         filter_flags: 'Flags',
         filter_verdict: 'Verdict',
+        filter_session: 'Session',
+        session_badge_title: 'Brainstorm session date',
+        stat_sessions: 'sessions',
+        stat_brainstorm: 'brainstorm',
         sort_verdict: 'Verdict',
         // Verdict display names
         verdict_do_now: 'Do now',
@@ -285,6 +289,10 @@ const I18N = {
         de_plan: 'План интеграции',
         filter_flags: 'Флаги',
         filter_verdict: 'Вердикт',
+        filter_session: 'Сессия',
+        session_badge_title: 'Дата brainstorm-сессии',
+        stat_sessions: 'сессий',
+        stat_brainstorm: 'brainstorm',
         sort_verdict: 'Вердикт',
         // Verdict display names
         verdict_do_now: 'Делать сейчас',
@@ -718,7 +726,7 @@ async function loadSheetData() {
     showLoading(true);
     try {
         // Batch get both sheets
-        const data = await sheetsRequest('/values:batchGet?ranges=Repos!A1:P1000&ranges=MyNotes!A1:F1000');
+        const data = await sheetsRequest('/values:batchGet?ranges=Repos!A1:P1000&ranges=MyNotes!A1:G1000');
         const ranges = data.valueRanges || [];
 
         // Parse Repos
@@ -750,6 +758,27 @@ async function loadSheetData() {
                     state.notes[obj.full_name] = obj;
                 }
             });
+        }
+
+        // Backfill brainstorm_session for existing brainstorm-flagged repos without a session date
+        let needsBackfill = false;
+        Object.values(state.notes).forEach(n => {
+            if (parseFlags(n.flags).includes('brainstorm') && !n.brainstorm_session) {
+                n.brainstorm_session = '2026-06-23';
+                needsBackfill = true;
+            }
+        });
+        if (needsBackfill) {
+            // Save backfilled data asynchronously (fire-and-forget)
+            const rows = [CONFIG.NOTES_HEADERS];
+            Object.values(state.notes).forEach(n => {
+                rows.push(CONFIG.NOTES_HEADERS.map(h => String(n[h] ?? '')));
+            });
+            sheetsRequest('/values/MyNotes!A1:G1000?valueInputOption=USER_ENTERED', {
+                method: 'PUT',
+                body: JSON.stringify({ range: 'MyNotes!A1:G1000', values: rows }),
+            }).then(() => console.info('Backfilled brainstorm_session for existing repos'))
+              .catch(e => console.warn('Backfill save failed:', e.message));
         }
 
         // Parse Deep (separate request — tab may not exist yet, must not break main load)
@@ -801,10 +830,20 @@ function showEmpty(show) {
 
 async function saveNote(fullName, field, value) {
     if (!state.notes[fullName]) {
-        state.notes[fullName] = { full_name: fullName, my_rating: 0, status: '', my_notes: '', reviewed_at: '', flags: '' };
+        state.notes[fullName] = { full_name: fullName, my_rating: 0, status: '', my_notes: '', reviewed_at: '', flags: '', brainstorm_session: '' };
     }
     state.notes[fullName][field] = value;
     state.notes[fullName].reviewed_at = new Date().toISOString().split('T')[0];
+
+    // Auto-manage brainstorm_session when flags change
+    if (field === 'flags') {
+        const flags = parseFlags(value);
+        if (flags.includes('brainstorm') && !state.notes[fullName].brainstorm_session) {
+            state.notes[fullName].brainstorm_session = new Date().toISOString().split('T')[0];
+        } else if (!flags.includes('brainstorm')) {
+            state.notes[fullName].brainstorm_session = '';
+        }
+    }
 
     // Update save indicator
     setSaveStatus(fullName, 'saving');
@@ -816,9 +855,9 @@ async function saveNote(fullName, field, value) {
     });
 
     try {
-        await sheetsRequest('/values/MyNotes!A1:F1000?valueInputOption=USER_ENTERED', {
+        await sheetsRequest('/values/MyNotes!A1:G1000?valueInputOption=USER_ENTERED', {
             method: 'PUT',
-            body: JSON.stringify({ range: 'MyNotes!A1:F1000', values: rows }),
+            body: JSON.stringify({ range: 'MyNotes!A1:G1000', values: rows }),
         });
         // Clear draft on successful save
         localStorage.removeItem(DRAFT_PREFIX + fullName);
@@ -916,6 +955,7 @@ function getFilteredRepos() {
         status: state.notes[r.full_name]?.status || 'new',
         my_notes: state.notes[r.full_name]?.my_notes || '',
         flags: parseFlags(state.notes[r.full_name]?.flags),
+        brainstorm_session: state.notes[r.full_name]?.brainstorm_session || '',
         deep: state.deep[r.full_name] || null,
         verdict: state.deep[r.full_name]?.verdict || '',
     }));
@@ -948,6 +988,10 @@ function getFilteredRepos() {
             if (state.filters.verdict.includes('—') && !v && !r.flags.includes('deep')) return true;
             return false;
         });
+    }
+    // Brainstorm session filter
+    if (state.filters.brainstorm_session && state.filters.brainstorm_session.length) {
+        repos = repos.filter(r => state.filters.brainstorm_session.includes(r.brainstorm_session));
     }
     if (state.searchQuery) {
         const q = state.searchQuery.toLowerCase();
@@ -1009,8 +1053,12 @@ function populateFilters() {
     // Verdict — fixed values plus specials
     populateMultiselect('filter-verdict', [...VERDICT_VALUES, '⏳', '—']);
 
+    // Brainstorm session — dynamic from data
+    const sessions = [...new Set(Object.values(state.notes).map(n => n.brainstorm_session).filter(Boolean))].sort();
+    populateMultiselect('filter-brainstorm-session', sessions);
+
     // Restore UI state from persisted filters
-    ['filter-category', 'filter-language', 'filter-status', 'filter-effort', 'filter-flags', 'filter-verdict'].forEach(updateMultiselectUI);
+    ['filter-category', 'filter-language', 'filter-status', 'filter-effort', 'filter-flags', 'filter-verdict', 'filter-brainstorm-session'].forEach(updateMultiselectUI);
 }
 
 // ============================================================
@@ -1144,6 +1192,14 @@ function renderStats(repos) {
     $('stat-total').textContent = `${total} ${t('stat_repos')}`;
     $('stat-filtered').textContent = `${repos.length} ${t('stat_shown')}`;
     $('stat-watched').textContent = `${watched} ${t('stat_watched')}`;
+
+    // Brainstorm session stats
+    const bsEl = $('stat-brainstorm');
+    if (bsEl) {
+        const bsNotes = Object.values(state.notes).filter(n => parseFlags(n.flags).includes('brainstorm'));
+        const bsSessions = new Set(bsNotes.map(n => n.brainstorm_session).filter(Boolean));
+        bsEl.textContent = `${bsSessions.size} ${t('stat_sessions')} · ${bsNotes.length} ${t('stat_brainstorm')}`;
+    }
 }
 
 function renderSortHeaders() {
@@ -1495,6 +1551,18 @@ function renderFlagsEditor(repo) {
     </div>`;
 }
 
+// Brainstorm session badge — shows date, editable inline
+function renderBrainstormBadge(repo) {
+    const session = repo.brainstorm_session || state.notes[repo.full_name]?.brainstorm_session || '';
+    if (!session && !(repo.flags || []).includes('brainstorm')) return '';
+    const display = session || '—';
+    return `<div class="bs-badge" data-repo="${repo.full_name}" title="${t('session_badge_title')}">
+        <span class="bs-badge-icon">🧠</span>
+        <input type="date" class="bs-badge-input" data-repo="${repo.full_name}" value="${session}">
+        <span class="bs-badge-label">${display}</span>
+    </div>`;
+}
+
 function renderCodeAnalysisSection(repo) {
     // Prefer rich deep-eval data; fall back to legacy Repos fields
     const deep = renderDeepEvalSection(repo);
@@ -1617,6 +1685,7 @@ function renderDetailRow(repo) {
                         </select>
                         ${starsHTML(repo.my_rating, repo.full_name)}
                         ${renderFlagsEditor(repo)}
+                        ${renderBrainstormBadge(repo)}
                     </div>
                     <a class="btn-github" href="${repo.url || 'https://github.com/' + repo.full_name}" target="_blank" rel="noopener">
                         <span class="material-symbols-outlined" style="font-size:14px">open_in_new</span>
@@ -1695,6 +1764,7 @@ function renderMobileCardBody(repo) {
             </a>
         </div>
         ${renderFlagsEditor(repo)}
+        ${renderBrainstormBadge(repo)}
     </div>`;
 }
 
@@ -1824,6 +1894,16 @@ function bindFlagEditors() {
                 saveNote(repo, 'flags', checked.join(','));
                 renderAll();
             });
+        });
+    });
+    // Brainstorm session badge — inline date edit
+    document.querySelectorAll('.bs-badge-input').forEach(input => {
+        input.addEventListener('click', (e) => e.stopPropagation());
+        input.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const repo = input.dataset.repo;
+            saveNote(repo, 'brainstorm_session', input.value);
+            renderAll();
         });
     });
 }
@@ -2592,6 +2672,7 @@ function buildExportRow(fullName) {
         my_notes: n.my_notes || '',
         flags: n.flags || '',
         reviewed_at: n.reviewed_at || '',
+        brainstorm_session: n.brainstorm_session || '',
         // Deep Eval tab
         target: d.target || '',
         gate_stack_fit: d.gate_stack_fit || '',
