@@ -623,6 +623,25 @@ body {
     letter-spacing: 0.03em;
 }
 
+/* Sentinel option — e.g. (unflagged), (no session) */
+.multiselect-option--special .multiselect-option-text {
+    font-style: italic;
+    color: var(--text-secondary);
+    text-transform: none;
+    letter-spacing: 0;
+}
+.multiselect-option--special input:checked ~ .multiselect-check {
+    background: var(--text-secondary);
+    border-color: var(--text-secondary);
+}
+
+.multiselect-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 3px 4px;
+    flex-shrink: 0;
+}
+
 .filter-search-wrap {
     position: relative;
     width: 220px;

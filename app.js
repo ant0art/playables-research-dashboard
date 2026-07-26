@@ -18,6 +18,10 @@ const CONFIG = {
 
 // Available flags (multi-value per repo, stored CSV in MyNotes.flags)
 const FLAG_VALUES = ['deep', 'reeval', 'brainstorm', 'draft', 'quick-win'];
+// Sentinel value that means "has NO flags at all"
+const FLAG_UNFLAGGED = '(unflagged)';
+// Sentinel value that means "has NO brainstorm session"
+const SESSION_NO_SESSION = '(no session)';
 
 // Sortable columns definition: col key -> { i18nKey, defaultDir }
 const SORTABLE_COLS = {
@@ -113,6 +117,8 @@ const I18N = {
         filter_status: 'Status',
         filter_effort: 'Effort',
         filter_search: 'Search repos...',
+        filter_unflagged: '(unflagged)',
+        filter_no_session: '(no session)',
         // Mobile sort
         sort_stars: '★ Stars ↓',
         sort_score: 'Score ↓',
@@ -244,6 +250,8 @@ const I18N = {
         filter_status: 'Статус',
         filter_effort: 'Сложность',
         filter_search: 'Поиск репо...',
+        filter_unflagged: '(без флагов)',
+        filter_no_session: '(без сессии)',
         sort_stars: '★ Звёзды ↓',
         sort_score: 'Оценка ↓',
         sort_rating: 'Рейтинг ↓',
@@ -974,8 +982,18 @@ function getFilteredRepos() {
         repos = repos.filter(r => state.filters.effort.includes(r.integration_effort));
     }
     // Flags — multi-value per repo: match if any selected flag is present
+    // Special sentinel FLAG_UNFLAGGED matches repos with zero flags
     if (state.filters.flags && state.filters.flags.length) {
-        repos = repos.filter(r => state.filters.flags.some(f => r.flags.includes(f)));
+        repos = repos.filter(r => {
+            for (const f of state.filters.flags) {
+                if (f === FLAG_UNFLAGGED) {
+                    if (r.flags.length === 0) return true;
+                } else {
+                    if (r.flags.includes(f)) return true;
+                }
+            }
+            return false;
+        });
     }
     // Verdict filter
     if (state.filters.verdict && state.filters.verdict.length) {
@@ -989,9 +1007,18 @@ function getFilteredRepos() {
             return false;
         });
     }
-    // Brainstorm session filter
+    // Brainstorm session filter — SESSION_NO_SESSION sentinel matches repos with no session
     if (state.filters.brainstorm_session && state.filters.brainstorm_session.length) {
-        repos = repos.filter(r => state.filters.brainstorm_session.includes(r.brainstorm_session));
+        repos = repos.filter(r => {
+            for (const s of state.filters.brainstorm_session) {
+                if (s === SESSION_NO_SESSION) {
+                    if (!r.brainstorm_session) return true;
+                } else {
+                    if (r.brainstorm_session === s) return true;
+                }
+            }
+            return false;
+        });
     }
     if (state.searchQuery) {
         const q = state.searchQuery.toLowerCase();
@@ -1045,17 +1072,17 @@ function populateFilters() {
     // Effort — fixed values
     populateMultiselect('filter-effort', ['low', 'medium', 'high']);
 
-    // Flags — known values plus any seen in data
+    // Flags — known values plus any seen in data; FLAG_UNFLAGGED sentinel first
     const seenFlags = new Set(FLAG_VALUES);
     Object.values(state.notes).forEach(n => parseFlags(n.flags).forEach(f => seenFlags.add(f)));
-    populateMultiselect('filter-flags', [...seenFlags]);
+    populateMultiselect('filter-flags', [FLAG_UNFLAGGED, ...seenFlags]);
 
     // Verdict — fixed values plus specials
     populateMultiselect('filter-verdict', [...VERDICT_VALUES, '⏳', '—']);
 
-    // Brainstorm session — dynamic from data
+    // Brainstorm session — dynamic from data; SESSION_NO_SESSION sentinel first
     const sessions = [...new Set(Object.values(state.notes).map(n => n.brainstorm_session).filter(Boolean))].sort();
-    populateMultiselect('filter-brainstorm-session', sessions);
+    populateMultiselect('filter-brainstorm-session', [SESSION_NO_SESSION, ...sessions]);
 
     // Restore UI state from persisted filters
     ['filter-category', 'filter-language', 'filter-status', 'filter-effort', 'filter-flags', 'filter-verdict', 'filter-brainstorm-session'].forEach(updateMultiselectUI);
@@ -1072,13 +1099,20 @@ function populateMultiselect(id, values) {
     const filterKey = container.dataset.filter;
     const selected = state.filters[filterKey] || [];
 
-    optionsWrap.innerHTML = values.map(v => {
+    // Sentinel values (e.g. FLAG_UNFLAGGED) start with "(" and get a special style
+    const isSentinel = v => v.startsWith('(');
+    const lastSentinelIdx = values.reduce((acc, v, i) => isSentinel(v) ? i : acc, -1);
+    optionsWrap.innerHTML = values.map((v, i) => {
         const checked = selected.includes(v) ? 'checked' : '';
-        return `<label class="multiselect-option">
+        const extraClass = isSentinel(v) ? ' multiselect-option--special' : '';
+        const divider = (i === lastSentinelIdx && i < values.length - 1)
+            ? '<div class="multiselect-divider"></div>'
+            : '';
+        return `<label class="multiselect-option${extraClass}">
             <input type="checkbox" value="${v}" ${checked}>
             <span class="multiselect-check"></span>
             <span class="multiselect-option-text">${v}</span>
-        </label>`;
+        </label>${divider}`;
     }).join('');
 
     // Bind checkbox events
